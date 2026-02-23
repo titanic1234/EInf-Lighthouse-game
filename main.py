@@ -69,5 +69,4 @@ def on_key_down(key):
 
 
 # Starte das Spiel
-if __name__ == '__main__':
-    pgzrun.go()
+pgzrun.go()
