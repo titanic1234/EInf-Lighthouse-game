@@ -11,8 +11,9 @@ from game.config import (
     STATE_PLACEMENT
 )
 from game.graphics import draw_gradient_background, GlowButton
+from game.states.base_state import BaseState
 
-class MenuState:
+class MenuState(BaseState):
     """Hauptmenü-State"""
 
     def __init__(self, game_manager):
@@ -22,7 +23,7 @@ class MenuState:
         Args:
             game_manager: Referenz zum GameManager
         """
-        self.game_manager = game_manager
+        super().__init__(game_manager)
         self.buttons = []
         self._create_buttons()
 

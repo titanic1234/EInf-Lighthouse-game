@@ -15,9 +15,10 @@ from game.config import (
 from game.entities.board import Board
 from game.entities.ship import Ship
 from game.graphics import draw_gradient_background, draw_rounded_rect
+from game.states.base_state import BaseState
 
 
-class PlacementState:
+class PlacementState(BaseState):
     """Schiffsplatzierungs-Phase"""
 
     def __init__(self, game_manager):
@@ -27,7 +28,7 @@ class PlacementState:
         Args:
             game_manager: Referenz zum GameManager
         """
-        self.game_manager = game_manager
+        super().__init__(game_manager)
         self.player_board = Board(PLAYER_GRID_X, GRID_OFFSET_Y, "Player")
 
         # Schiffe die platziert werden müssen

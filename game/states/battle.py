@@ -15,14 +15,15 @@ from game.config import (
 from game.entities.board import Board
 from game.ai.computer_ai import ComputerAI
 from game.graphics import draw_gradient_background, draw_rounded_rect, ParticleSystem
+from game.states.base_state import BaseState
 
 
-class BattleState:
+class BattleState(BaseState):
     """Kampf-Phase: Spieler gegen Computer"""
 
     def __init__(self, game_manager):
         """Initialisiert die Kampfphase"""
-        self.game_manager = game_manager
+        super().__init__(game_manager)
         self.player_board = game_manager.player_board
 
         self.computer_board = Board(COMPUTER_GRID_X, GRID_OFFSET_Y, "Computer")

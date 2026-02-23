@@ -6,48 +6,15 @@ Zeigt Gewinner und Optionen an
 from pygame import Rect
 from game.config import (
     WINDOW_WIDTH, WINDOW_HEIGHT,
-    COLOR_WHITE, COLOR_BLACK, COLOR_BLUE, COLOR_GREEN, COLOR_RED,
-    BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_COLOR, BUTTON_HOVER_COLOR,
+    COLOR_BLACK, COLOR_BLUE, COLOR_GREEN, COLOR_RED,
+    BUTTON_WIDTH, BUTTON_HEIGHT,
     STATE_MENU, STATE_PLACEMENT
 )
+from game.states.base_state import BaseState
+from game.ui.buttons import FlatButton
 
 
-class Button:
-    """Einfache Button-Klasse"""
-
-    def __init__(self, x, y, width, height, text, action):
-        self.x = x
-        self.y = y
-        self.width = width
-        self.height = height
-        self.text = text
-        self.action = action
-        self.hovered = False
-
-    def is_hovered(self, mouse_x, mouse_y):
-        return (self.x - self.width // 2 <= mouse_x <= self.x + self.width // 2 and
-                self.y - self.height // 2 <= mouse_y <= self.y + self.height // 2)
-
-    def update(self, mouse_x, mouse_y):
-        self.hovered = self.is_hovered(mouse_x, mouse_y)
-
-    def draw(self, screen):
-        color = BUTTON_HOVER_COLOR if self.hovered else BUTTON_COLOR
-
-        rect = Rect(self.x - self.width // 2, self.y - self.height // 2,
-                    self.width, self.height)
-        screen.draw.filled_rect(rect, color)
-        screen.draw.rect(rect, COLOR_WHITE)
-
-        screen.draw.text(self.text, center=(self.x, self.y),
-                        fontsize=32, color=COLOR_WHITE)
-
-    def click(self):
-        if self.action:
-            self.action()
-
-
-class GameOverState:
+class GameOverState(BaseState):
     """Game-Over-Screen"""
 
     def __init__(self, game_manager):
@@ -57,7 +24,7 @@ class GameOverState:
         Args:
             game_manager: Referenz zum GameManager
         """
-        self.game_manager = game_manager
+        super().__init__(game_manager)
         self.winner = game_manager.winner
         self.buttons = []
         self._create_buttons()
@@ -69,19 +36,19 @@ class GameOverState:
 
         # "Neues Spiel" Button
         self.buttons.append(
-            Button(center_x, start_y, BUTTON_WIDTH, BUTTON_HEIGHT,
+            FlatButton(center_x, start_y, BUTTON_WIDTH, BUTTON_HEIGHT,
                   "Neues Spiel", self._new_game)
         )
 
         # "Hauptmenü" Button
         self.buttons.append(
-            Button(center_x, start_y + 80, BUTTON_WIDTH, BUTTON_HEIGHT,
+            FlatButton(center_x, start_y + 80, BUTTON_WIDTH, BUTTON_HEIGHT,
                   "Hauptmenü", self._main_menu)
         )
 
         # "Beenden" Button
         self.buttons.append(
-            Button(center_x, start_y + 160, BUTTON_WIDTH, BUTTON_HEIGHT,
+            FlatButton(center_x, start_y + 160, BUTTON_WIDTH, BUTTON_HEIGHT,
                   "Beenden", self._quit_game)
         )
 

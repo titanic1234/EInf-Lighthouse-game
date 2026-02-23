@@ -13,6 +13,13 @@ from game.states.game_over import GameOverState
 class GameManager:
     """Zentrale Spielverwaltung mit State-Pattern"""
 
+    STATE_MAP = {
+        STATE_MENU: MenuState,
+        STATE_PLACEMENT: PlacementState,
+        STATE_BATTLE: BattleState,
+        STATE_GAME_OVER: GameOverState,
+    }
+
     def __init__(self):
         """Initialisiert den Game-Manager"""
         self.current_state_name = STATE_MENU
@@ -34,17 +41,11 @@ class GameManager:
         """
         self.current_state_name = new_state_name
 
-        # State-Factory
-        if new_state_name == STATE_MENU:
-            self.current_state = MenuState(self)
-        elif new_state_name == STATE_PLACEMENT:
-            self.current_state = PlacementState(self)
-        elif new_state_name == STATE_BATTLE:
-            self.current_state = BattleState(self)
-        elif new_state_name == STATE_GAME_OVER:
-            self.current_state = GameOverState(self)
-        else:
+        state_class = self.STATE_MAP.get(new_state_name)
+        if not state_class:
             raise ValueError(f"Unbekannter State: {new_state_name}")
+
+        self.current_state = state_class(self)
 
     def reset_game(self):
         """Setzt das Spiel zurück"""
@@ -80,7 +81,7 @@ class GameManager:
             pos: Position (x, y)
             button: Maustaste (1=links, 2=mitte, 3=rechts)
         """
-        if self.current_state and hasattr(self.current_state, 'on_mouse_down'):
+        if self.current_state:
             self.current_state.on_mouse_down(pos, button)
 
     def on_key_down(self, key):
@@ -90,5 +91,5 @@ class GameManager:
         Args:
             key: Taste (pgzero key)
         """
-        if self.current_state and hasattr(self.current_state, 'on_key_down'):
+        if self.current_state:
             self.current_state.on_key_down(key)

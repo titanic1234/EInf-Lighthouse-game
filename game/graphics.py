@@ -2,6 +2,7 @@ import pygame
 import random
 import math
 from game.config import WINDOW_WIDTH, WINDOW_HEIGHT
+from game.ui.buttons import BaseButton
 
 # Create reusable procedural graphics
 
@@ -27,28 +28,18 @@ def draw_rounded_rect(surface, color, rect, radius=10, width=0, alpha=255):
     else:
         pygame.draw.rect(surface, color, rect, border_radius=radius, width=width)
 
-class GlowButton:
+class GlowButton(BaseButton):
     def __init__(self, x, y, width, height, text, action):
-        self.rect = pygame.Rect(x - width//2, y - height//2, width, height)
-        self.text = text
-        self.action = action
-        self.hovered = False
+        super().__init__(x, y, width, height, text, action)
         self.hover_progress = 0.0 # Für weiche Übergänge
-        
-    def is_hovered(self, mouse_x, mouse_y):
-        return self.rect.collidepoint(mouse_x, mouse_y)
-        
+
     def update(self, dt, mouse_x, mouse_y):
-        self.hovered = self.is_hovered(mouse_x, mouse_y)
+        super().update(dt, mouse_x, mouse_y)
         if self.hovered:
             self.hover_progress = min(1.0, self.hover_progress + dt * 6.0)
         else:
             self.hover_progress = max(0.0, self.hover_progress - dt * 6.0)
-            
-    def click(self):
-        if self.action:
-            self.action()
-            
+
     def draw(self, screen_surface, default_color=(40, 80, 150), hover_color=(70, 130, 220)):
         # Calculate current color based on hover progress
         r = int(default_color[0] + (hover_color[0] - default_color[0]) * self.hover_progress)
