@@ -16,6 +16,7 @@ from game.entities.board import Board
 from game.entities.ship import Ship
 from game.graphics import draw_gradient_background, draw_rounded_rect
 from game.states.base_state import BaseState
+from pgzero.constants import keys
 
 
 class PlacementState(BaseState):
@@ -90,7 +91,7 @@ class PlacementState(BaseState):
     def on_key_down(self, key):
         """Behandelt Tasteneingaben"""
         # R-Taste: Rotation
-        if key.name == 'r' and self.current_ship:
+        if key == keys.R and self.current_ship:
             self.current_orientation = (
                 ORIENTATION_VERTICAL if self.current_orientation == ORIENTATION_HORIZONTAL
                 else ORIENTATION_HORIZONTAL
