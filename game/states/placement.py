@@ -3,6 +3,7 @@ Schiffsplatzierungs-State
 Spieler platziert seine Schiffe auf dem Board
 """
 
+import pygame
 from pygame import Rect
 from game.config import (
     WINDOW_WIDTH, WINDOW_HEIGHT, GRID_SIZE, CELL_SIZE,
@@ -13,6 +14,7 @@ from game.config import (
 )
 from game.entities.board import Board
 from game.entities.ship import Ship
+from game.graphics import draw_gradient_background, draw_rounded_rect
 
 
 class PlacementState:
@@ -47,13 +49,7 @@ class PlacementState:
                 self.ships_to_place.append(Ship(name, ship_length))
 
     def update(self, dt, mouse_pos):
-        """
-        Aktualisiert die Platzierungsphase
-
-        Args:
-            dt: Delta-Zeit
-            mouse_pos: Tuple (x, y) der Mausposition
-        """
+        """Aktualisiert die Platzierungsphase"""
         if not self.current_ship:
             return
 
@@ -71,13 +67,7 @@ class PlacementState:
             self.placement_valid = False
 
     def on_mouse_down(self, pos, button):
-        """
-        Behandelt Mausklicks
-
-        Args:
-            pos: Tuple (x, y)
-            button: Maustaste
-        """
+        """Behandelt Mausklicks"""
         if button == 1 and self.current_ship and self.preview_position and self.placement_valid:
             # Platziere Schiff
             row, col = self.preview_position
@@ -97,12 +87,7 @@ class PlacementState:
                     self._start_battle()
 
     def on_key_down(self, key):
-        """
-        Behandelt Tasteneingaben
-
-        Args:
-            key: Taste (pgzero key constant)
-        """
+        """Behandelt Tasteneingaben"""
         # R-Taste: Rotation
         if key.name == 'r' and self.current_ship:
             self.current_orientation = (
@@ -116,35 +101,37 @@ class PlacementState:
         self.game_manager.change_state(STATE_BATTLE)
 
     def draw(self, screen):
-        """
-        Zeichnet die Platzierungsphase
+        """Zeichnet die Platzierungsphase"""
+        # Tactical Background
+        draw_gradient_background(screen.surface, (15, 25, 40), (5, 10, 20))
 
-        Args:
-            screen: pgzero Screen-Objekt
-        """
-        screen.clear()
-        screen.fill(COLOR_BLACK)
-
-        # Titel
-        screen.draw.text("Platziere deine Schiffe", center=(WINDOW_WIDTH // 2, 30),
-                        fontsize=40, color=COLOR_WHITE)
+        # Titel Menu bar glow
+        panel_rect = Rect(WINDOW_WIDTH//2 - 300, 10, 600, 50)
+        draw_rounded_rect(screen.surface, (0, 0, 0), panel_rect, radius=15, alpha=150)
+        draw_rounded_rect(screen.surface, (100, 150, 255), panel_rect, radius=15, width=2, alpha=100)
+        
+        screen.draw.text("COMMANDER, DEPLOY YOUR FLEET", center=(WINDOW_WIDTH // 2, 35),
+                        fontsize=36, color=(200, 230, 255))
 
         # Anleitung
         if self.current_ship:
-            instruction = f"Platziere: {self.current_ship.name} (Länge: {self.current_ship.length})"
-            screen.draw.text(instruction, center=(WINDOW_WIDTH // 2, 70),
-                           fontsize=24, color=COLOR_GREEN)
-            screen.draw.text("R = Rotieren | Linksklick = Platzieren",
+            instruction = f"ACTIVE UNIT: {self.current_ship.name.upper()} (LRG: {self.current_ship.length})"
+            screen.draw.text(instruction, center=(WINDOW_WIDTH // 2, 85),
+                           fontsize=26, color=(100, 255, 150))
+            screen.draw.text("PRESS R TO ROTATE | LEFT CLICK TO DEPLOY",
                            center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT - 30),
-                           fontsize=20, color=COLOR_WHITE)
+                           fontsize=22, color=(150, 180, 220))
 
         # Zeichne Spielfeld
         self._draw_board(screen)
 
-        # Fortschrittsanzeige
-        progress = f"Schiff {self.current_ship_index + 1} / {len(self.ships_to_place)}"
-        screen.draw.text(progress, (WINDOW_WIDTH - 200, 30),
-                        fontsize=24, color=COLOR_WHITE)
+        # Fortschrittsanzeige Panel
+        prog_rect = Rect(WINDOW_WIDTH - 280, 20, 250, 40)
+        draw_rounded_rect(screen.surface, (0, 0, 0), prog_rect, radius=10, alpha=150)
+        
+        progress = f"UNIT {self.current_ship_index + 1} OF {len(self.ships_to_place)}"
+        screen.draw.text(progress, center=(WINDOW_WIDTH - 155, 40),
+                        fontsize=22, color=(255, 200, 100))
 
         # Bereits platzierte Schiffe auflisten
         self._draw_placed_ships_list(screen)
@@ -152,6 +139,11 @@ class PlacementState:
     def _draw_board(self, screen):
         """Zeichnet das Spielfeld mit Vorschau"""
         board = self.player_board
+
+        # Draw board background glow
+        bg_rect = Rect(board.x_offset - 10, board.y_offset - 10, GRID_SIZE * CELL_SIZE + 20, GRID_SIZE * CELL_SIZE + 20)
+        draw_rounded_rect(screen.surface, (10, 20, 40), bg_rect, radius=10, alpha=180)
+        draw_rounded_rect(screen.surface, (50, 100, 200), bg_rect, radius=10, width=2, alpha=80)
 
         # Zeichne Grid
         for row in range(GRID_SIZE):
@@ -161,16 +153,16 @@ class PlacementState:
 
                 cell = board.get_cell(row, col)
 
-                # Hintergrund
-                if cell.has_ship():
-                    # Bereits platziertes Schiff
-                    screen.blit('ship_h', (x, y))
-                else:
-                    screen.blit('water', (x, y))
+                # Cell Background
+                cell_rect = Rect(x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2)
+                draw_rounded_rect(screen.surface, (20, 40, 80), cell_rect, radius=4, alpha=100)
 
-                # Grid-Linien
-                rect = Rect(x, y, CELL_SIZE, CELL_SIZE)
-                screen.draw.rect(rect, COLOR_GRAY)
+                if cell.has_ship():
+                     # Platziertes Schiff (glow effect)
+                     draw_rounded_rect(screen.surface, (100, 200, 255), cell_rect, radius=4, alpha=200)
+
+                # Subtle Grid-Linien
+                screen.draw.rect(Rect(x, y, CELL_SIZE, CELL_SIZE), (40, 60, 100))
 
         # Zeichne Vorschau
         if self.preview_position and self.current_ship:
@@ -183,7 +175,7 @@ class PlacementState:
 
         row, col = self.preview_position
         ship = self.current_ship
-        color = COLOR_GREEN if self.placement_valid else COLOR_RED
+        color = (50, 255, 100) if self.placement_valid else (255, 50, 50)
 
         # Zeichne alle Zellen die das Schiff belegen würde
         for i in range(ship.length):
@@ -194,21 +186,24 @@ class PlacementState:
                 x = self.player_board.x_offset + preview_col * CELL_SIZE
                 y = self.player_board.y_offset + preview_row * CELL_SIZE
 
-                # Halbtransparenter Overlay (simuliert durch hellere Farbe)
                 rect = Rect(x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4)
-                screen.draw.filled_rect(rect, color + (100,) if len(color) == 3 else color)
-                screen.draw.rect(rect, color)
+                draw_rounded_rect(screen.surface, color, rect, radius=4, alpha=150)
+                draw_rounded_rect(screen.surface, color, rect, radius=4, width=2, alpha=255)
 
     def _draw_placed_ships_list(self, screen):
         """Zeichnet eine Liste der bereits platzierten Schiffe"""
         x = 50
-        y = WINDOW_HEIGHT - 150
+        y = WINDOW_HEIGHT - 200
 
-        screen.draw.text("Platzierte Schiffe:", (x, y),
-                        fontsize=20, color=COLOR_WHITE)
+        panel_rect = Rect(x - 10, y - 10, 220, 180)
+        draw_rounded_rect(screen.surface, (0, 0, 0), panel_rect, radius=10, alpha=150)
+        draw_rounded_rect(screen.surface, (50, 100, 150), panel_rect, radius=10, width=1, alpha=80)
+
+        screen.draw.text("DEPLOYED UNITS", (x, y),
+                        fontsize=20, color=(150, 200, 255))
 
         for i, ship in enumerate(self.player_board.ships):
             y_offset = y + 30 + i * 25
-            text = f"✓ {ship.name}"
+            text = f"✓ {ship.name.upper()}"
             screen.draw.text(text, (x, y_offset),
-                           fontsize=18, color=COLOR_GREEN)
+                           fontsize=18, color=(100, 255, 150))

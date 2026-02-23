@@ -1,7 +1,8 @@
 """
-Hauptmenü-State
+Hauptmenü-State mit aufgewerteter UI
 """
 
+import pygame
 from pygame import Rect
 from game.config import (
     WINDOW_WIDTH, WINDOW_HEIGHT, TITLE,
@@ -9,57 +10,7 @@ from game.config import (
     BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_COLOR, BUTTON_HOVER_COLOR,
     STATE_PLACEMENT
 )
-
-
-class Button:
-    """Einfache Button-Klasse"""
-
-    def __init__(self, x, y, width, height, text, action):
-        """
-        Initialisiert einen Button
-
-        Args:
-            x, y: Position (zentriert)
-            width, height: Größe
-            text: Button-Text
-            action: Callback-Funktion
-        """
-        self.x = x
-        self.y = y
-        self.width = width
-        self.height = height
-        self.text = text
-        self.action = action
-        self.hovered = False
-
-    def is_hovered(self, mouse_x, mouse_y):
-        """Prüft ob Maus über Button ist"""
-        return (self.x - self.width // 2 <= mouse_x <= self.x + self.width // 2 and
-                self.y - self.height // 2 <= mouse_y <= self.y + self.height // 2)
-
-    def update(self, mouse_x, mouse_y):
-        """Aktualisiert Hover-Status"""
-        self.hovered = self.is_hovered(mouse_x, mouse_y)
-
-    def draw(self, screen):
-        """Zeichnet den Button"""
-        color = BUTTON_HOVER_COLOR if self.hovered else BUTTON_COLOR
-
-        # Button-Rechteck
-        rect = Rect(self.x - self.width // 2, self.y - self.height // 2,
-                    self.width, self.height)
-        screen.draw.filled_rect(rect, color)
-        screen.draw.rect(rect, COLOR_WHITE)
-
-        # Text
-        screen.draw.text(self.text, center=(self.x, self.y),
-                        fontsize=32, color=COLOR_WHITE)
-
-    def click(self):
-        """Führt die Button-Aktion aus"""
-        if self.action:
-            self.action()
-
+from game.graphics import draw_gradient_background, GlowButton
 
 class MenuState:
     """Hauptmenü-State"""
@@ -78,17 +29,17 @@ class MenuState:
     def _create_buttons(self):
         """Erstellt die Menü-Buttons"""
         center_x = WINDOW_WIDTH // 2
-        start_y = WINDOW_HEIGHT // 2
+        start_y = WINDOW_HEIGHT // 2 + 50
 
         # "Neues Spiel" Button
         self.buttons.append(
-            Button(center_x, start_y, BUTTON_WIDTH, BUTTON_HEIGHT,
+            GlowButton(center_x, start_y, BUTTON_WIDTH, BUTTON_HEIGHT,
                   "Neues Spiel", self._start_game)
         )
 
         # "Beenden" Button
         self.buttons.append(
-            Button(center_x, start_y + 80, BUTTON_WIDTH, BUTTON_HEIGHT,
+            GlowButton(center_x, start_y + 80, BUTTON_WIDTH, BUTTON_HEIGHT,
                   "Beenden", self._quit_game)
         )
 
@@ -102,25 +53,13 @@ class MenuState:
         sys.exit()
 
     def update(self, dt, mouse_pos):
-        """
-        Aktualisiert das Menü
-
-        Args:
-            dt: Delta-Zeit
-            mouse_pos: Tuple (x, y) der Mausposition
-        """
+        """Aktualisiert das Menü"""
         mouse_x, mouse_y = mouse_pos
         for button in self.buttons:
-            button.update(mouse_x, mouse_y)
+            button.update(dt, mouse_x, mouse_y)
 
     def on_mouse_down(self, pos, button):
-        """
-        Behandelt Mausklicks
-
-        Args:
-            pos: Tuple (x, y)
-            button: Maustaste
-        """
+        """Behandelt Mausklicks"""
         if button == 1:  # Linke Maustaste
             for btn in self.buttons:
                 if btn.hovered:
@@ -128,27 +67,36 @@ class MenuState:
                     break
 
     def draw(self, screen):
-        """
-        Zeichnet das Menü
+        """Zeichnet das Menü"""
+        # Premium Gradient Background
+        draw_gradient_background(screen.surface, (20, 30, 60), (5, 10, 20))
 
-        Args:
-            screen: pgzero Screen-Objekt
-        """
-        screen.clear()
-        screen.fill(COLOR_BLACK)
-
-        # Titel
-        screen.draw.text(TITLE, center=(WINDOW_WIDTH // 2, 150),
-                        fontsize=64, color=COLOR_BLUE)
+        # Titel (Schatten + Glowing Text)
+        title_font = pygame.font.Font(None, 80)
+        
+        # Shadow
+        shadow_surf = title_font.render(TITLE.upper(), True, (0, 0, 0))
+        shadow_rect = shadow_surf.get_rect(center=(WINDOW_WIDTH // 2, 134))
+        screen.surface.blit(shadow_surf, shadow_rect)
+        
+        # Main Title (Glowing Blue/White)
+        title_surf = title_font.render(TITLE.upper(), True, (200, 230, 255))
+        title_rect = title_surf.get_rect(center=(WINDOW_WIDTH // 2, 130))
+        screen.surface.blit(title_surf, title_rect)
 
         # Untertitel
-        screen.draw.text("Battleship", center=(WINDOW_WIDTH // 2, 220),
-                        fontsize=32, color=COLOR_WHITE)
+        sub_font = pygame.font.Font(None, 40)
+        sub_surf = sub_font.render("TACTICAL NAVAL COMBAT", True, (100, 150, 255))
+        sub_rect = sub_surf.get_rect(center=(WINDOW_WIDTH // 2, 190))
+        screen.surface.blit(sub_surf, sub_rect)
 
         # Buttons
         for button in self.buttons:
-            button.draw(screen)
+            button.draw(screen.surface)
 
-        # Steuerungshinweise
-        screen.draw.text("Steuerung: Maus", center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT - 50),
-                        fontsize=20, color=COLOR_WHITE)
+        # Steuerungshinweise am unteren Rand
+        info_font = pygame.font.Font(None, 24)
+        info_surf = info_font.render("Steuerung: Maus", True, (100, 100, 120))
+        info_rect = info_surf.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT - 30))
+        screen.surface.blit(info_surf, info_rect)
+
