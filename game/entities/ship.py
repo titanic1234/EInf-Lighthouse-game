@@ -73,7 +73,7 @@ class Ship:
             col = self.col
         if orientation is None:
             orientation = self.orientation
-        return self.get_coordinates_at(self.row, self.col, self.orientation)
+        return self.get_coordinates_at(row, col, orientation)
 
     def reset(self):
         """Setzt das Schiff zurück"""

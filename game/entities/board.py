@@ -116,9 +116,9 @@ class Board:
                 while not placed and attempts < 1000:
                     row = random.randint(0, GRID_SIZE - 1)
                     col = random.randint(0, GRID_SIZE - 1)
+                    ship = Ship(ship_name, ship_length, shape=ship_shape)
                     orientation = random.randint(0, ship.get_rotation_count() - 1)
 
-                    ship = Ship(ship_name, ship_length, shape=ship_shape)
                     if self.place_ship(ship, row, col, orientation):
                         placed = True
                     attempts += 1
