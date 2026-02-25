@@ -8,7 +8,7 @@ from game.config import ORIENTATION_HORIZONTAL, ORIENTATION_VERTICAL
 class Ship:
     """Repräsentiert ein Schiff"""
 
-    def __init__(self, name, length):
+    def __init__(self, name, length, shape=None):
         """
         Initialisiert ein Schiff
 
@@ -19,6 +19,7 @@ class Ship:
         self.name = name
         self.length = length
         self.orientation = ORIENTATION_HORIZONTAL
+        self.shape = shape
         self.row = 0
         self.col = 0
         self.hits = 0
@@ -57,22 +58,22 @@ class Ship:
         Returns:
             bool: True wenn versenkt, sonst False
         """
-        return self.hits >= self.length
+        return self.hits >= self.get_size()
 
-    def get_coordinates(self):
+    def get_coordinates(self, row=None, col=None, orientation=None):
         """
         Gibt alle Koordinaten zurück, die das Schiff belegt
 
         Returns:
             list: Liste von (row, col) Tupeln
         """
-        coords = []
-        for i in range(self.length):
-            if self.orientation == ORIENTATION_HORIZONTAL:
-                coords.append((self.row, self.col + i))
-            else:  # ORIENTATION_VERTICAL
-                coords.append((self.row + i, self.col))
-        return coords
+        if row is None:
+            row = self.row
+        if col is None:
+            col = self.col
+        if orientation is None:
+            orientation = self.orientation
+        return self.get_coordinates_at(self.row, self.col, self.orientation)
 
     def reset(self):
         """Setzt das Schiff zurück"""
@@ -84,5 +85,40 @@ class Ship:
 
     def __repr__(self):
         orientation_str = "H" if self.orientation == ORIENTATION_HORIZONTAL else "V"
-        status = "VERSENKT" if self.is_destroyed() else f"{self.hits}/{self.length}"
+        status = "VERSENKT" if self.is_destroyed() else f"{self.hits}/{self.get_size()}"
         return f"{self.name} [{orientation_str}] @ ({self.row},{self.col}) - {status}"
+
+    def _base_offsets(self):
+        """Gibt Zell-Offsets fuer horizontale Ausrichtung zurueck."""
+        if self.shape == "carrier_l":
+            return [(0, 0), (0, 1), (1, 0), (1, 1), (1, 2)]
+        return [(0, i) for i in range(self.length)]
+
+    def get_rotation_count(self):
+        """Anzahl an unterschiedlichen Ausrichtungen je schiff form"""
+        if self.shape == "carrier_l":
+            return 4
+        return 2
+
+    def _oriented_offsets(self, orientation):
+        """Richtet Offsets gemäß Orientierung aus."""
+        offsets = self._base_offsets()
+        rotation_steps = orientation % self.get_rotation_count()
+
+        for _ in range(rotation_steps):
+            # 90° Drehung im Uhrzeigersinn
+            offsets = [(c, -r) for r, c in offsets]
+            # auf positive Koordinaten normalisieren
+            min_row = min(r for r, _ in offsets)
+            min_col = min(c for _, c in offsets)
+            offsets = [(r - min_row, c - min_col) for r, c in offsets]
+
+        return offsets
+
+    def get_coordinates_at(self, row, col, orientation):
+        """Koordinaten fuer eine potenzielle Platzierung."""
+        return [(row + dr, col + dc) for dr, dc in self._oriented_offsets(orientation)]
+
+    def get_size(self):
+        """Anzahl belegter Zellen."""
+        return len(self._base_offsets())

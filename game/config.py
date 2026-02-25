@@ -44,8 +44,9 @@ BUTTON_TEXT_COLOR = COLOR_WHITE
 SHIP_TYPES = [
     ("Schlachtschiff", 5, 1),
     ("Kreuzer", 4, 1),
-    ("Zerstoerer", 3, 2),
+    ("Zerstörer", 3, 2),
     ("U-Boot", 2, 1),
+    ("Flugzeugträger", 5, 1, "carrier_l")
 ]
 
 # Spielzustaende

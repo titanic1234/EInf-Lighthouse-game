@@ -180,7 +180,8 @@ class BattleState(BaseState):
 
         if hit:
             if destroyed:
-                self.message = f"ALERT: ALLY {ship.name.upper()} SUNK!"
+                ship_name = theme_manager.get_ship_display_name(ship.name)
+                self.message = f"ALERT: ALLY {ship_name.upper()} SUNK!"
             else:
                 self.message = f"WARNING: HULL BREACH AT ({row}, {col})!"
         else:
