@@ -20,7 +20,7 @@ def update():
             config.update_fullscreen(True, False)
     except pygame.error:
         print("Display was closed")
-    # Simple fix 60fps dt
+    # Simple 60fps dt
     dt = 1 / 60.0
     game_manager.update(dt, mouse_position)
 

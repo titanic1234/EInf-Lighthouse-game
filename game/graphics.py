@@ -1,9 +1,125 @@
 import math
+import os
 import random
 import pygame
 import game.config as config
+from game.entities import ship
 from game.ui.buttons import BaseButton
 from game.theme import theme_manager
+
+
+_SHIP_IMAGE_CACHE = {}
+_SHIP_RENDER_CACHE = {}
+
+_THEME_SHIP_IMAGE_MAP = {
+    "MODERN": {
+        "Schlachtschiff": "Schlachtschiff(5x1).png",
+        "Kreuzer": "Kreuzer(4x1).png",
+        "Zerstörer": "Zerstoerer(3x1).png",
+        "U-Boot": "U-Boot(2x1).png",
+        "Flugzeugträger": "Flugzeugträger(3x2).png",
+    },
+    "PIRATE": {
+        "Schlachtschiff": "Flaggschiff(5x1).png",
+        "Kreuzer": "Galeone(4x1).png",
+        "Zerstörer": "Fregatte(3x1).png",
+        "U-Boot": "Schaluppe(2x1).png",
+        "Flugzeugträger": "Moerser_Brigg(3x2).png",
+    },
+}
+
+
+def _normalize_ship_name(ship_name):
+    base_name = ship_name.split(" #", 1)[0]
+    return base_name.replace("ae", "ä").replace("oe", "ö").replace("ue", "ü")
+
+
+def _get_ship_image(theme_name, ship_name):
+    normalized_name = _normalize_ship_name(ship_name)
+    file_name = _THEME_SHIP_IMAGE_MAP.get(theme_name, {}).get(normalized_name)
+    if not file_name:
+        return None
+
+    cache_key = (theme_name, ship_name)
+    if cache_key not in _SHIP_IMAGE_CACHE:
+        image_path = os.path.join("images", file_name)
+        if not os.path.exists(image_path):
+            return None
+        _SHIP_IMAGE_CACHE[cache_key] = pygame.image.load(image_path).convert_alpha()
+
+    return _SHIP_IMAGE_CACHE[cache_key]
+
+
+def _draw_ship_cell_image(screen, x, y, cell):
+    if not cell.has_ship():
+        return False
+
+    ship = cell.ship
+    coords = ship.get_coordinates()
+    if not coords:
+        return False
+
+    min_row = min(r for r, _ in coords)
+    min_col = min(c for _, c in coords)
+    max_row = max(r for r, _ in coords)
+    max_col = max(c for _, c in coords)
+
+    grid_height = max_row - min_row + 1
+    grid_width = max_col - min_col + 1
+
+    local_row = cell.row - min_row
+    local_col = cell.col - min_col
+    if local_row < 0 or local_col < 0 or local_row >= grid_height or local_col >= grid_width:
+        return False
+
+    source_image = _get_ship_image(theme_manager.current.name, ship.name)
+    if source_image is None:
+        return False
+
+    orientation_steps = ship.orientation % ship.get_rotation_count()
+    render_key = (
+        theme_manager.current.name,
+        ship.name,
+        orientation_steps,
+        grid_width,
+        grid_height,
+        config.CELL_SIZE,
+    )
+    transformed = _SHIP_RENDER_CACHE.get(render_key)
+    if transformed is None:
+        """Resized das bild um besser in die Kästchen zu passen.
+        nutzt eine Länge voll aus und passt die andere an, um min 50% auszufüllen (50% vermindert warp)"""
+        rotated = pygame.transform.rotate(source_image, -90 * orientation_steps)
+        target_width = grid_width * config.CELL_SIZE
+        target_height = grid_height * config.CELL_SIZE
+        source_width, source_height = rotated.get_size()
+
+        min_breadth = max(1, config.CELL_SIZE // 2)
+        if target_width >= target_height:
+            scaled_width = target_width
+            scaled_height = int(source_height * (scaled_width / max(1, source_width)))
+            scaled_height = max(min_breadth, min(target_height, scaled_height))
+        else:
+            scaled_height = target_height
+            scaled_width = int(source_width * (scaled_height / max(1, source_height)))
+            scaled_width = max(min_breadth, min(target_width, scaled_width))
+
+        scaled_ship = pygame.transform.smoothscale(rotated, (scaled_width, scaled_height))
+        transformed = pygame.Surface((target_width, target_height), pygame.SRCALPHA)
+        transformed.blit(
+            scaled_ship,
+            ((target_width - scaled_width) // 2, (target_height - scaled_height) // 2),
+        )
+        _SHIP_RENDER_CACHE[render_key] = transformed
+
+    area = pygame.Rect(
+        local_col * config.CELL_SIZE,
+        local_row * config.CELL_SIZE,
+        config.CELL_SIZE,
+        config.CELL_SIZE,
+    )
+    screen.blit(transformed, (x, y), area=area)
+    return True
 
 
 def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True):
@@ -14,16 +130,24 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True):
     # Base Water Cell
     draw_rounded_rect(screen, theme.color_water, cell_rect, radius=4, alpha=150)
 
+    # Zeige enemy ship png nur bei schon zerstörten Schiffen
+    should_show_ship = (
+        cell.has_ship()
+        and ((show_ships and not is_enemy) or (is_enemy and (show_ships or cell.status == config.CELL_DESTROYED)))
+    )
+
     # Schiff
-    if show_ships and cell.has_ship() and not cell.is_shot():
-        draw_rounded_rect(screen, theme.color_ship, cell_rect, radius=4, alpha=230)
-        # Inner highlight
-        inner = pygame.Rect(x + 4, y + 4, config.CELL_SIZE - 8, config.CELL_SIZE - 8)
-        draw_rounded_rect(screen, theme.color_ship_border, inner, radius=2, alpha=100)
+    ship_image_drawn = False
+    if should_show_ship:
+        ship_image_drawn = _draw_ship_cell_image(screen, x, y, cell)
+        if not ship_image_drawn:  # Wenn kein img gefunden wurde einfach Kästchen
+            draw_rounded_rect(screen, theme.color_ship, cell_rect, radius=4, alpha=230)
+            inner = pygame.Rect(x + 4, y + 4, config.CELL_SIZE - 8, config.CELL_SIZE - 8)
+            draw_rounded_rect(screen, theme.color_ship_border, inner, radius=2, alpha=100)
 
     # Status (Treffer/Fehlschuss) zeichnen
     if cell.status == 2:  # CELL_HIT
-        draw_rounded_rect(screen, theme.color_hit, cell_rect, radius=4, alpha=180)
+        draw_rounded_rect(screen, theme.color_hit, cell_rect, radius=4, alpha=120 if ship_image_drawn else 180)
         pygame.draw.line(screen, config.COLOR_WHITE, (x + 8, y + 8),
                          (x + config.CELL_SIZE - 8, y + config.CELL_SIZE - 8), 3)
         pygame.draw.line(screen, config.COLOR_WHITE, (x + config.CELL_SIZE - 8, y + 8),
@@ -31,10 +155,10 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True):
     elif cell.status == 3:  # CELL_MISS
         pygame.draw.circle(screen, theme.color_miss, (x + config.CELL_SIZE // 2, y + config.CELL_SIZE // 2), 6)
     elif cell.status == 4:  # CELL_DESTROYED
-        draw_rounded_rect(screen, theme.color_destroyed, cell_rect, radius=4, alpha=220)
-        pygame.draw.line(screen, (255, 100, 100), (x + 6, y + 6), (x + config.CELL_SIZE - 6, y + config.CELL_SIZE - 6),
+        draw_rounded_rect(screen, theme.color_destroyed, cell_rect, radius=4, alpha=110 if ship_image_drawn else 220)
+        pygame.draw.line(screen, (255, 220, 120), (x + 6, y + 6), (x + config.CELL_SIZE - 6, y + config.CELL_SIZE - 6),
                          5)
-        pygame.draw.line(screen, (255, 100, 100), (x + config.CELL_SIZE - 6, y + 6), (x + 6, y + config.CELL_SIZE - 6),
+        pygame.draw.line(screen, (255, 220, 120), (x + config.CELL_SIZE - 6, y + 6), (x + 6, y + config.CELL_SIZE - 6),
                          5)
 
     # Grid-Linien (Subtle)

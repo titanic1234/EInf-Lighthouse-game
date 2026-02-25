@@ -49,7 +49,7 @@ class GameOverState(BaseState):
                 start_y + config.GAME_OVER_BUTTON_SPACING,
                 config.GAME_OVER_BUTTON_WIDTH,
                 config.GAME_OVER_BUTTON_HEIGHT,
-                "ZUM MENUE",
+                "ZUM MENÜ",
                 self._main_menu,
             )
         )
