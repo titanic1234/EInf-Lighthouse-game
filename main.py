@@ -1,72 +1,53 @@
-"""
-Schiffe Versenken - Main Entry Point
-Pygame Zero Game
-
-Starte mit: pgzrun main.py
-"""
-
 import pgzrun
+import pygame
+import game.config as config
 from game.game_manager import GameManager
-from game.config import WINDOW_WIDTH, WINDOW_HEIGHT, TITLE
+global WIDTH, HEIGHT
+WIDTH = config.WINDOW_WIDTH
+HEIGHT = config.WINDOW_HEIGHT
+TITLE = config.TITLE
+DISPLAY_FLAGS = pygame.RESIZABLE if config.WINDOW_RESIZABLE else 0
 
-# Fensterkonfiguration
-WIDTH = WINDOW_WIDTH
-HEIGHT = WINDOW_HEIGHT
-TITLE = TITLE
 
-# Game-Manager initialisieren
 game_manager = GameManager()
 
-
-def update(dt):
-    """
-    Pygame Zero Update-Funktion
-    Wird jeden Frame aufgerufen
-
-    Args:
-        dt: Delta-Zeit seit letztem Frame
-    """
-    mouse_pos = (0, 0)
+def update():
+    mouse_position = pygame.mouse.get_pos()
     try:
-        import pygame
-        mouse_pos = pygame.mouse.get_pos()
-    except:
-        pass
-
-    game_manager.update(dt, mouse_pos)
-
+        if not config.WINDOW_FULLSCREEN and not config.WINDOW_FULLSCREEN_CHANGED:
+            print("FULLSCREEN")
+            screen.surface = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN)
+            config.update_fullscreen(True, False)
+    except pygame.error:
+        print("Display was closed")
+    # Simple fix 60fps dt
+    dt = 1 / 60.0
+    game_manager.update(dt, mouse_position)
 
 def draw():
-    """
-    Pygame Zero Draw-Funktion
-    Zeichnet den aktuellen Frame
-    """
-    game_manager.draw(screen)
-
+    screen.surface.fill((0, 0, 0))
+    game_manager.draw(screen.surface)
 
 def on_mouse_down(pos, button):
-    """
-    Pygame Zero Mouse-Event
-    Wird bei Mausklick aufgerufen
-
-    Args:
-        pos: Position (x, y)
-        button: Maustaste (mouse.LEFT, mouse.MIDDLE, mouse.RIGHT)
-    """
-    button_num = 1 if button == 1 else (2 if button == 2 else 3)
-    game_manager.on_mouse_down(pos, button_num)
-
+    game_manager.on_mouse_down(pos, button)
 
 def on_key_down(key):
-    """
-    Pygame Zero Keyboard-Event
-    Wird bei Tastendruck aufgerufen
-
-    Args:
-        key: Gedrueckte Taste
-    """
     game_manager.on_key_down(key)
+    if key == pygame.K_ESCAPE:
+        import sys
+        sys.exit()
+    elif key == pygame.K_F11:
+        try:
+            if not config.WINDOW_FULLSCREEN:
+                screen.surface = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN)
+                config.update_fullscreen(True, True)
+            else:
+                screen.surface = pygame.display.set_mode((WIDTH, HEIGHT), DISPLAY_FLAGS)
+                config.update_fullscreen(False, True)
+        except pygame.error:
+            print("Display was closed")
 
 
-# Starte das Spiel
+
 pgzrun.go()
+

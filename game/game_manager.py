@@ -28,6 +28,9 @@ class GameManager:
         # Gemeinsame Spieldaten
         self.player_board = None
         self.winner = None
+        self.shots_fired = 0
+        self.shots_hit = 0
+        self.time_elapsed = 0.0
 
         # Initialer State
         self.change_state(STATE_MENU)
@@ -51,6 +54,8 @@ class GameManager:
         """Setzt das Spiel zurück"""
         self.player_board = None
         self.winner = None
+        self.shots_fired = 0
+        self.shots_hit = 0
 
     def update(self, dt, mouse_pos):
         """
@@ -60,6 +65,7 @@ class GameManager:
             dt: Delta-Zeit
             mouse_pos: Mausposition (x, y)
         """
+        self.time_elapsed += dt
         if self.current_state:
             self.current_state.update(dt, mouse_pos)
 

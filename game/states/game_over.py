@@ -4,14 +4,10 @@ Zeigt Gewinner und Optionen an
 """
 
 from pygame import Rect
-from game.config import (
-    WINDOW_WIDTH, WINDOW_HEIGHT,
-    COLOR_BLACK, COLOR_BLUE, COLOR_GREEN, COLOR_RED,
-    BUTTON_WIDTH, BUTTON_HEIGHT,
-    STATE_MENU, STATE_PLACEMENT
-)
+import game.config as config
 from game.states.base_state import BaseState
-from game.ui.buttons import FlatButton
+from game.graphics import draw_text, draw_gradient_background, GlowButton
+from game.theme import theme_manager
 
 
 class GameOverState(BaseState):
@@ -31,36 +27,54 @@ class GameOverState(BaseState):
 
     def _create_buttons(self):
         """Erstellt die Buttons"""
-        center_x = WINDOW_WIDTH // 2
-        start_y = WINDOW_HEIGHT // 2 + 50
+        center_x = config.WINDOW_WIDTH // 2
+        start_y = config.WINDOW_HEIGHT // 2 + 50
 
         # "Neues Spiel" Button
         self.buttons.append(
-            FlatButton(center_x, start_y, BUTTON_WIDTH, BUTTON_HEIGHT,
-                  "Neues Spiel", self._new_game)
+            GlowButton(
+                center_x,
+                start_y,
+                config.GAME_OVER_BUTTON_WIDTH,
+                config.GAME_OVER_BUTTON_HEIGHT,
+                "NEUES SPIEL",
+                self._new_game,
+            )
         )
 
-        # "Hauptmenü" Button
+        # "Hauptmenue" Button
         self.buttons.append(
-            FlatButton(center_x, start_y + 80, BUTTON_WIDTH, BUTTON_HEIGHT,
-                  "Hauptmenü", self._main_menu)
+            GlowButton(
+                center_x,
+                start_y + config.GAME_OVER_BUTTON_SPACING,
+                config.GAME_OVER_BUTTON_WIDTH,
+                config.GAME_OVER_BUTTON_HEIGHT,
+                "ZUM MENUE",
+                self._main_menu,
+            )
         )
 
         # "Beenden" Button
         self.buttons.append(
-            FlatButton(center_x, start_y + 160, BUTTON_WIDTH, BUTTON_HEIGHT,
-                  "Beenden", self._quit_game)
+            GlowButton(
+                center_x,
+                start_y + config.GAME_OVER_BUTTON_SPACING * 2,
+                config.GAME_OVER_BUTTON_WIDTH,
+                config.GAME_OVER_BUTTON_HEIGHT,
+                "BEENDEN",
+                self._quit_game,
+            )
         )
 
     def _new_game(self):
         """Startet ein neues Spiel"""
         self.game_manager.reset_game()
-        self.game_manager.change_state(STATE_PLACEMENT)
+        self.game_manager.change_state(config.STATE_PLACEMENT)
 
     def _main_menu(self):
-        """Zurück zum Hauptmenü"""
+        """Zurueck zum Hauptmenue"""
         self.game_manager.reset_game()
-        self.game_manager.change_state(STATE_MENU)
+        self.game_manager.change_state(config.STATE_MENU)
 
     def _quit_game(self):
         """Beendet das Spiel"""
@@ -77,7 +91,7 @@ class GameOverState(BaseState):
         """
         mouse_x, mouse_y = mouse_pos
         for button in self.buttons:
-            button.update(mouse_x, mouse_y)
+            button.update(dt, mouse_x, mouse_y)
 
     def on_mouse_down(self, pos, button):
         """
@@ -96,30 +110,56 @@ class GameOverState(BaseState):
     def draw(self, screen):
         """
         Zeichnet den Game-Over-Screen
-
-        Args:
-            screen: pgzero Screen-Objekt
         """
-        screen.clear()
-        screen.fill(COLOR_BLACK)
+        theme = theme_manager.current
+        draw_gradient_background(screen, time_value=self.game_manager.time_elapsed)
 
         # Titel
-        title = "Du hast gewonnen!" if self.winner == "Player" else "Du hast verloren!"
-        title_color = COLOR_GREEN if self.winner == "Player" else COLOR_RED
+        title = "VICTORY!" if self.winner == "Player" else "DEFEAT!"
+        title_color = theme.color_text_primary if self.winner == "Player" else theme.color_text_enemy
 
-        screen.draw.text(title, center=(WINDOW_WIDTH // 2, 150),
-                        fontsize=56, color=title_color)
+        draw_text(
+            screen,
+            title,
+            config.WINDOW_WIDTH // 2,
+            config.GAME_OVER_TITLE_Y,
+            config.GAME_OVER_TITLE_FONT_SIZE,
+            title_color,
+            center=True,
+        )
 
         # Untertitel
         if self.winner == "Player":
-            subtitle = "Alle gegnerischen Schiffe wurden versenkt!"
-            subtitle_color = COLOR_GREEN
+            subtitle = theme.text_game_over_win
+            subtitle_color = theme.color_text_secondary
         else:
-            subtitle = "Alle deine Schiffe wurden versenkt!"
-            subtitle_color = COLOR_RED
+            subtitle = theme.text_game_over_lose
+            subtitle_color = theme.color_text_enemy
 
-        screen.draw.text(subtitle, center=(WINDOW_WIDTH // 2, 220),
-                        fontsize=28, color=subtitle_color)
+        draw_text(
+            screen,
+            subtitle,
+            config.WINDOW_WIDTH // 2,
+            config.GAME_OVER_SUBTITLE_Y,
+            config.GAME_OVER_SUBTITLE_FONT_SIZE,
+            subtitle_color,
+            center=True,
+        )
+
+        accuracy = 0
+        if self.game_manager.shots_fired > 0:
+            accuracy = int((self.game_manager.shots_hit / self.game_manager.shots_fired) * 100)
+
+        stats_text = f"Accuracy: {accuracy}% ({self.game_manager.shots_hit}/{self.game_manager.shots_fired} hits)"
+        draw_text(
+            screen,
+            stats_text,
+            config.WINDOW_WIDTH // 2,
+            config.GAME_OVER_STATS_Y,
+            config.GAME_OVER_STATS_FONT_SIZE,
+            theme.color_text_primary,
+            center=True,
+        )
 
         # Buttons
         for button in self.buttons:
@@ -127,10 +167,26 @@ class GameOverState(BaseState):
 
         # Dekorative Elemente
         if self.winner == "Player":
-            # Sieges-Nachricht
-            screen.draw.text("⚓ SIEG! ⚓", center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT - 50),
-                           fontsize=32, color=COLOR_BLUE)
+            draw_text(
+                screen,
+                "OK",
+                config.WINDOW_WIDTH // 2,
+                config.WINDOW_HEIGHT - config.GAME_OVER_ICON_MARGIN_BOTTOM,
+                config.GAME_OVER_ICON_FONT_SIZE,
+                theme.color_text_secondary,
+                center=True,
+            )
         else:
-            # Niederlagen-Nachricht
-            screen.draw.text("☠ NIEDERLAGE ☠", center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT - 50),
-                           fontsize=32, color=COLOR_RED)
+            draw_text(
+                screen,
+                "SKULL",
+                config.WINDOW_WIDTH // 2,
+                config.WINDOW_HEIGHT - config.GAME_OVER_ICON_MARGIN_BOTTOM,
+                config.GAME_OVER_ICON_FONT_SIZE,
+                theme.color_text_enemy,
+                center=True,
+            )
+
+    def on_resize(self, width, height):
+        self.buttons = []
+        self._create_buttons()
