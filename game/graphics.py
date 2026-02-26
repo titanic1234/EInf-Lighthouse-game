@@ -216,22 +216,22 @@ def draw_title_art(screen):
     elif theme.name == "PIRATE":
         # Wooden Pirate Galleon
         hull = [
-            (center_x - 200, 350),  # Back bottom
-            (center_x + 150, 350),  # Front bottom
-            (center_x + 250, 260),  # Bow tip
-            (center_x - 220, 260),  # Back top
+            (center_x - 200, 350 + 170),  # Back bottom
+            (center_x + 150, 350 + 170),  # Front bottom
+            (center_x + 250, 260 + 170),  # Bow tip
+            (center_x - 220, 260 + 170),  # Back top
         ]
         pygame.draw.polygon(screen, (139, 69, 19), hull)  # SaddleBrown
         pygame.draw.polygon(screen, (101, 67, 33), hull, 4)  # Dark Brown outline
 
         # Masts
-        pygame.draw.line(screen, (101, 67, 33), (center_x - 100, 260), (center_x - 100, 100), 8)
-        pygame.draw.line(screen, (101, 67, 33), (center_x + 50, 260), (center_x + 50, 120), 8)
-        pygame.draw.line(screen, (101, 67, 33), (center_x + 250, 260), (center_x + 320, 190), 6)  # Bowsprit
+        pygame.draw.line(screen, (101, 67, 33), (center_x - 100, 260 + 170), (center_x - 100, 100 + 170), 8)
+        pygame.draw.line(screen, (101, 67, 33), (center_x + 50, 260 + 170), (center_x + 50, 120 + 170), 8)
+        pygame.draw.line(screen, (101, 67, 33), (center_x + 250, 260 + 170), (center_x + 320, 190 + 170), 6)  # Bowsprit
 
         # Sails
-        sail1 = [(center_x - 100, 120), (center_x - 180, 240), (center_x - 20, 240)]
-        sail2 = [(center_x + 50, 140), (center_x - 30, 250), (center_x + 130, 250)]
+        sail1 = [(center_x - 100, 120 + 170), (center_x - 180, 240 + 170), (center_x - 20, 240 + 170)]
+        sail2 = [(center_x + 50, 140 + 170), (center_x - 30, 250 + 170), (center_x + 130, 250 + 170)]
         pygame.draw.polygon(screen, (240, 230, 200), sail1)
         pygame.draw.polygon(screen, (240, 230, 200), sail2)
         pygame.draw.polygon(screen, (200, 190, 160), sail1, 2)
@@ -239,8 +239,8 @@ def draw_title_art(screen):
 
         # Cannons out the side
         for cx in [center_x - 150, center_x - 50, center_x + 50]:
-            pygame.draw.circle(screen, (30, 30, 30), (cx, 300), 12)  # Port hole
-            pygame.draw.circle(screen, (10, 10, 10), (cx, 300), 8)  # Inner
+            pygame.draw.circle(screen, (30, 30, 30), (cx, 300 + 170), 12)  # Port hole
+            pygame.draw.circle(screen, (10, 10, 10), (cx, 300 + 170), 8)  # Inner
 
     # Water reflection
     for i in range(4):

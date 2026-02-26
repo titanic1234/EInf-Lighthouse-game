@@ -300,7 +300,7 @@ class BattleState(BaseState):
 
         draw_text(
             screen,
-            f"ALLIED UNITS ACTIVE: {player_ships_alive}/{player_ships_total}",
+            f"EIGENE SCHIFFE EINSATZBEREIT: {player_ships_alive}/{player_ships_total}",
             config.PLAYER_GRID_X + 25,
             y + 25,
             config.BATTLE_STAT_FONT_SIZE,
@@ -317,7 +317,7 @@ class BattleState(BaseState):
 
         draw_text(
             screen,
-            f"ENEMY UNITS ACTIVE: {computer_ships_alive}/{computer_ships_total}",
+            f"GEGNERISCHE SCHIFFE AKTIV: {computer_ships_alive}/{computer_ships_total}",
             config.COMPUTER_GRID_X + 25,
             y + 25,
             config.BATTLE_STAT_FONT_SIZE,

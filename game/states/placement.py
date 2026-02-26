@@ -126,7 +126,7 @@ class PlacementState(BaseState):
         # Anleitung
         if self.current_ship:
             display_name = theme_manager.get_ship_display_name(self.current_ship.name)
-            instruction = f"ACTIVE UNIT: {display_name.upper()} (LRG: {self.current_ship.get_size()})"
+            instruction = f"AUSGEWÄHLTES SCHIFF: {display_name.upper()} (LÄNGE: {self.current_ship.get_size()})"
             draw_text(
                 screen,
                 instruction,
@@ -158,7 +158,7 @@ class PlacementState(BaseState):
         )
         draw_rounded_rect(screen, (0, 0, 0), prog_rect, radius=15, alpha=150)
 
-        progress = f"UNIT {self.current_ship_index + 1} OF {len(self.ships_to_place)}"
+        progress = f"SCHIFF {self.current_ship_index + 1} VON {len(self.ships_to_place)}"
         draw_text(
             screen,
             progress,
@@ -239,12 +239,12 @@ class PlacementState(BaseState):
         draw_rounded_rect(screen, (0, 0, 0), panel_rect, radius=15, alpha=150)
         draw_rounded_rect(screen, (50, 100, 150), panel_rect, radius=15, width=2, alpha=80)
 
-        draw_text(screen, "DEPLOYED UNITS", x, y, config.PLACEMENT_SHIP_LIST_TITLE_FONT_SIZE, (150, 200, 255))
+        draw_text(screen, "PLATZIERTE SCHIFFE", x, y, config.PLACEMENT_SHIP_LIST_TITLE_FONT_SIZE, (150, 200, 255))
 
         for i, ship in enumerate(self.player_board.ships):
             y_offset = y + 50 + i * config.PLACEMENT_SHIP_LIST_ITEM_SPACING
             display_name = theme_manager.get_ship_display_name(ship.name)
-            text = f"OK {display_name.upper()}"
+            text = f"{display_name.upper()} hat den Hafen verlassen"
             draw_text(screen, text, x, y_offset, config.PLACEMENT_SHIP_LIST_ITEM_FONT_SIZE, (100, 255, 150))
 
     def on_resize(self, width, height):

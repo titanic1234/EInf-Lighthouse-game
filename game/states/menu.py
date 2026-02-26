@@ -7,6 +7,7 @@ import game.config as config
 from game.graphics import draw_gradient_background, GlowButton, draw_title_art
 from game.theme import theme_manager
 from game.states.base_state import BaseState
+import game.theme as theme
 
 
 class MenuState(BaseState):
@@ -28,6 +29,11 @@ class MenuState(BaseState):
         center_x = config.WINDOW_WIDTH // 2
         start_y = config.MENU_BUTTON_Y
         theme = theme_manager.current
+        self.toggle_text = ""
+        if theme.name == "MODERN":
+            self.toggle_text = "PIRATEN MODUS"
+        else:
+            self.toggle_text = "CLASSIC MODUS"
 
         # "Neues Spiel" Button
         self.buttons.append(
@@ -48,7 +54,7 @@ class MenuState(BaseState):
                 start_y + config.MENU_BUTTON_SPACING,
                 config.MENU_BUTTON_WIDTH,
                 config.MENU_BUTTON_HEIGHT,
-                "TOGGLE THEME",
+                self.toggle_text, #Button Text
                 self._toggle_theme,
             )
         )
