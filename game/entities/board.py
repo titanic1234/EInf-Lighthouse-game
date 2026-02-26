@@ -58,19 +58,15 @@ class Board:
         Returns:
             bool: True wenn platzierbar, sonst False
         """
+        coordinates = ship.get_coordinates(row, col, orientation)
+
         # Prüfe ob innerhalb der Grenzen
-        if orientation == ORIENTATION_HORIZONTAL:
-            if col + ship.length > GRID_SIZE:
-                return False
-        else:  # ORIENTATION_VERTICAL
-            if row + ship.length > GRID_SIZE:
+        for check_row, check_col in coordinates:
+            if not (0 <= check_row < GRID_SIZE and 0 <= check_col < GRID_SIZE):
                 return False
 
         # Prüfe alle Zellen + angrenzende Zellen (Schiffe dürfen sich nicht berühren)
-        for i in range(ship.length):
-            check_row = row if orientation == ORIENTATION_HORIZONTAL else row + i
-            check_col = col + i if orientation == ORIENTATION_HORIZONTAL else col
-
+        for check_row, check_col in coordinates:
             # Prüfe die Zelle selbst und alle 8 Nachbarn
             for dr in range(-1, 2):
                 for dc in range(-1, 2):
@@ -99,11 +95,10 @@ class Board:
         ship.place(row, col, orientation)
 
         # Platziere Schiff auf allen Zellen
-        for i in range(ship.length):
-            cell_row = row if orientation == ORIENTATION_HORIZONTAL else row + i
-            cell_col = col + i if orientation == ORIENTATION_HORIZONTAL else col
-
+        for cell_row, cell_col in ship.get_coordinates_at(row, col, orientation):
             cell = self.get_cell(cell_row, cell_col)
+            if cell is None:
+                return False
             cell.place_ship(ship)
             ship.add_cell(cell)
 
@@ -112,16 +107,18 @@ class Board:
 
     def place_ships_randomly(self):
         """Platziert alle Schiffe zufällig auf dem Board (für Computer)"""
-        for ship_name, ship_length, ship_count in SHIP_TYPES:
+        for ship_type in SHIP_TYPES:
+            ship_name, ship_length, ship_count = ship_type[:3]
+            ship_shape = ship_type[3] if len(ship_type) > 3 else None
             for _ in range(ship_count):
                 placed = False
                 attempts = 0
                 while not placed and attempts < 1000:
                     row = random.randint(0, GRID_SIZE - 1)
                     col = random.randint(0, GRID_SIZE - 1)
-                    orientation = random.choice([ORIENTATION_HORIZONTAL, ORIENTATION_VERTICAL])
+                    ship = Ship(ship_name, ship_length, shape=ship_shape)
+                    orientation = random.randint(0, ship.get_rotation_count() - 1)
 
-                    ship = Ship(ship_name, ship_length)
                     if self.place_ship(ship, row, col, orientation):
                         placed = True
                     attempts += 1

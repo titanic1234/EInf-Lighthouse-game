@@ -39,10 +39,12 @@ class PlacementState(BaseState):
 
     def _create_ships(self):
         """Erstellt alle Schiffe die platziert werden muessen"""
-        for ship_name, ship_length, ship_count in config.SHIP_TYPES:
+        for ship_type in config.SHIP_TYPES:
+            ship_name, ship_length, ship_count = ship_type[:3]
+            ship_shape = ship_type[3] if len(ship_type) > 3 else None
             for i in range(ship_count):
                 name = f"{ship_name} #{i+1}" if ship_count > 1 else ship_name
-                self.ships_to_place.append(Ship(name, ship_length))
+                self.ships_to_place.append(Ship(name, ship_length, shape=ship_shape))
 
     def update(self, dt, mouse_pos):
         """Aktualisiert die Platzierungsphase"""
@@ -87,9 +89,8 @@ class PlacementState(BaseState):
         # R-Taste: Rotation
         if key == pygame.K_r and self.current_ship:
             self.current_orientation = (
-                config.ORIENTATION_VERTICAL if self.current_orientation == config.ORIENTATION_HORIZONTAL
-                else config.ORIENTATION_HORIZONTAL
-            )
+                   self.current_orientation + 1
+            ) % self.current_ship.get_rotation_count()
 
     def _start_battle(self):
         """Startet die Kampfphase"""
@@ -124,7 +125,8 @@ class PlacementState(BaseState):
 
         # Anleitung
         if self.current_ship:
-            instruction = f"ACTIVE UNIT: {self.current_ship.name.upper()} (LRG: {self.current_ship.length})"
+            display_name = theme_manager.get_ship_display_name(self.current_ship.name)
+            instruction = f"ACTIVE UNIT: {display_name.upper()} (LRG: {self.current_ship.get_size()})"
             draw_text(
                 screen,
                 instruction,
@@ -208,9 +210,7 @@ class PlacementState(BaseState):
         color = (50, 255, 100) if self.placement_valid else (255, 50, 50)
 
         # Zeichne alle Zellen die das Schiff belegen wuerde
-        for i in range(ship.length):
-            preview_row = row if self.current_orientation == config.ORIENTATION_HORIZONTAL else row + i
-            preview_col = col + i if self.current_orientation == config.ORIENTATION_HORIZONTAL else col
+        for preview_row, preview_col in ship.get_coordinates_at(row, col, self.current_orientation):
 
             if 0 <= preview_row < config.GRID_SIZE and 0 <= preview_col < config.GRID_SIZE:
                 x = self.player_board.x_offset + preview_col * config.CELL_SIZE
@@ -239,9 +239,14 @@ class PlacementState(BaseState):
         draw_rounded_rect(screen, (0, 0, 0), panel_rect, radius=15, alpha=150)
         draw_rounded_rect(screen, (50, 100, 150), panel_rect, radius=15, width=2, alpha=80)
 
-        draw_text(screen, "SCHIFFE AUF SEE", x, y, config.PLACEMENT_SHIP_LIST_TITLE_FONT_SIZE, (150, 200, 255))
+        draw_text(screen, "DEPLOYED UNITS", x, y, config.PLACEMENT_SHIP_LIST_TITLE_FONT_SIZE, (150, 200, 255))
 
         for i, ship in enumerate(self.player_board.ships):
             y_offset = y + 50 + i * config.PLACEMENT_SHIP_LIST_ITEM_SPACING
-            text = f"{ship.name.upper()}"
+            display_name = theme_manager.get_ship_display_name(ship.name)
+            text = f"OK {display_name.upper()}"
             draw_text(screen, text, x, y_offset, config.PLACEMENT_SHIP_LIST_ITEM_FONT_SIZE, (100, 255, 150))
+
+    def on_resize(self, width, height):
+        self.player_board.x_offset = config.PLAYER_GRID_X
+        self.player_board.y_offset = config.GRID_OFFSET_Y

@@ -46,6 +46,7 @@ SHIP_TYPES = [
     ("Kreuzer", 4, 1),
     ("Zerstörer", 3, 2),
     ("U-Boot", 2, 1),
+    ("Flugzeugträger", 5, 1, "carrier_l")
 ]
 
 # Spielzustaende

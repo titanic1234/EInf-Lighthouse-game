@@ -1,3 +1,6 @@
+from game.entities import ship
+
+
 class Theme:
     def __init__(self, name):
         self.name = name
@@ -38,6 +41,7 @@ class Theme:
         self.text_target_destroyed = ""
         self.text_already_compromised = ""
         self.text_computer_turn = ""
+        self.ship_name_overrides = {}
 
 
 class ModernTheme(Theme):
@@ -122,6 +126,13 @@ class PirateTheme(Theme):
         self.text_computer_turn = "DIE SPANIER LADEN IHRE KANONEN..."
         self.text_game_over_win = "DIE FEINDLICHE FLOTTE IST GESUNKEN! ARRR!"
         self.text_game_over_lose = "WIR GEHEN UNTER, KÄPT'N!"
+        self.ship_name_overrides = {
+            "Schlachtschiff": "Flaggschiff",
+            "Kreuzer": "Galeone",
+            "Zerstoerer": "Fregatte",
+            "U-Boot": "Schaluppe",
+            "Flugzeugträger": "Mörser Brigg",
+        }
 
 
 class ThemeManager:
@@ -135,6 +146,18 @@ class ThemeManager:
             self.current = self.pirate
         else:
             self.current = self.modern
+
+    def get_ship_display_name(self, ship_name):
+        """Liefert Schiffnamen für aktives Theme"""
+        suffix = ""
+        base_name = ship_name
+
+        if "#" in ship_name:
+            base_name, suffix = ship_name.split(" #", 1)
+            suffix = f" #{suffix}"
+
+        display_name = self.current.ship_name_overrides.get(base_name, base_name)
+        return f"{display_name}{suffix}"
 
 
 # Globale Instanz
