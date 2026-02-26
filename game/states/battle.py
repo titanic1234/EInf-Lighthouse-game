@@ -183,9 +183,9 @@ class BattleState(BaseState):
                 ship_name = theme_manager.get_ship_display_name(ship.name)
                 self.message = f"ALERT: ALLY {ship_name.upper()} SUNK!"
             else:
-                self.message = f"WARNING: HULL BREACH AT ({row}, {col})!"
+                self.message = f"WARNING: HULL BREACH AT ({row +1}, {col +1})!"
         else:
-            self.message = f"ENEMY MISSED AT ({row}, {col})."
+            self.message = f"ENEMY MISSED AT ({row + 1}, {col + 1})."
 
         if self.player_board.all_ships_destroyed():
             self.game_over = True
@@ -270,7 +270,7 @@ class BattleState(BaseState):
         for i in range(config.GRID_SIZE):
             draw_text(
                 screen,
-                str(i),
+                str(i + 1),
                 board.x_offset - 35,
                 board.y_offset + i * config.CELL_SIZE + config.CELL_SIZE // 2 - 12,
                 config.BATTLE_LABEL_FONT_SIZE,
