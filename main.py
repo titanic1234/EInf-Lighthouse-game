@@ -15,7 +15,6 @@ def update():
     mouse_position = pygame.mouse.get_pos()
     try:
         if not config.WINDOW_FULLSCREEN and not config.WINDOW_FULLSCREEN_CHANGED:
-            print("FULLSCREEN")
             screen.surface = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN)
             config.update_fullscreen(True, False)
     except pygame.error:

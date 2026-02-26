@@ -134,7 +134,3 @@ class MenuState(BaseState):
             center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT - config.MENU_INFO_MARGIN_BOTTOM)
         )
         screen.blit(info_surf, info_rect)
-
-    def on_resize(self, width, height):
-        self.buttons = []
-        self._create_buttons()

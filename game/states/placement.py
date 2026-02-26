@@ -239,13 +239,9 @@ class PlacementState(BaseState):
         draw_rounded_rect(screen, (0, 0, 0), panel_rect, radius=15, alpha=150)
         draw_rounded_rect(screen, (50, 100, 150), panel_rect, radius=15, width=2, alpha=80)
 
-        draw_text(screen, "DEPLOYED UNITS", x, y, config.PLACEMENT_SHIP_LIST_TITLE_FONT_SIZE, (150, 200, 255))
+        draw_text(screen, "SCHIFFE AUF SEE", x, y, config.PLACEMENT_SHIP_LIST_TITLE_FONT_SIZE, (150, 200, 255))
 
         for i, ship in enumerate(self.player_board.ships):
             y_offset = y + 50 + i * config.PLACEMENT_SHIP_LIST_ITEM_SPACING
-            text = f"OK {ship.name.upper()}"
+            text = f"{ship.name.upper()}"
             draw_text(screen, text, x, y_offset, config.PLACEMENT_SHIP_LIST_ITEM_FONT_SIZE, (100, 255, 150))
-
-    def on_resize(self, width, height):
-        self.player_board.x_offset = config.PLAYER_GRID_X
-        self.player_board.y_offset = config.GRID_OFFSET_Y
