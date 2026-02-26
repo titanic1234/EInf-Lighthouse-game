@@ -105,6 +105,20 @@ class Board:
         self.ships.append(ship)
         return True
 
+
+    def remove_ship(self, ship):
+        """Entfernt plaziertes Ship für neues placement"""
+        if ship not in self.ships:
+            return False
+
+        for cell in list(ship.cells):
+            cell.reset()
+        ship.reset()
+        self.ships.remove(ship)
+        self.all_ships_placed = False
+        return True
+
+
     def place_ships_randomly(self):
         """Platziert alle Schiffe zufällig auf dem Board (für Computer)"""
         for ship_type in SHIP_TYPES:

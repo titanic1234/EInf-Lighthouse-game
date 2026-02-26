@@ -8,7 +8,7 @@ from pygame import Rect
 import game.config as config
 from game.entities.board import Board
 from game.entities.ship import Ship
-from game.graphics import draw_gradient_background, draw_rounded_rect, draw_text, draw_grid_cell
+from game.graphics import draw_gradient_background, draw_rounded_rect, draw_text, draw_grid_cell, GlowButton, _get_ship_image
 from game.theme import theme_manager
 from game.states.base_state import BaseState
 
@@ -26,16 +26,18 @@ class PlacementState(BaseState):
         super().__init__(game_manager)
         self.player_board = Board(config.PLAYER_GRID_X, config.GRID_OFFSET_Y, "Player")
 
-        # Schiffe die platziert werden muessen
+        # Plazierbare Schiffe
         self.ships_to_place = []
         self._create_ships()
 
-        self.current_ship_index = 0
-        self.current_ship = self.ships_to_place[0] if self.ships_to_place else None
-        self.current_orientation = config.ORIENTATION_HORIZONTAL
+        self.selected_ship = self.ships_to_place[0] if self.ships_to_place else None
+        self.current_orientation = self.selected_ship.orientation if self.selected_ship else config.ORIENTATION_HORIZONTAL
 
-        self.preview_position = None  # (row, col) fuer Vorschau
+        self.preview_position = None  # (row, col) für Vorschau
         self.placement_valid = False
+
+        self.ship_list_item_rects = []
+        self.start_button = self._build_start_button()
 
     def _create_ships(self):
         """Erstellt alle Schiffe die platziert werden muessen"""
@@ -46,54 +48,134 @@ class PlacementState(BaseState):
                 name = f"{ship_name} #{i+1}" if ship_count > 1 else ship_name
                 self.ships_to_place.append(Ship(name, ship_length, shape=ship_shape))
 
-    def update(self, dt, mouse_pos):
-        """Aktualisiert die Platzierungsphase"""
-        if not self.current_ship:
+    def _is_ship_placed(self, ship):
+        return ship in self.player_board.ships
+
+    def _all_ships_placed(self):
+        return len(self.player_board.ships) == len(self.ships_to_place)
+
+    def _build_start_button(self):
+        return GlowButton(
+            config.WINDOW_WIDTH - config.BATTLE_AIRSTRIKE_BUTTON_WIDTH // 2 - 30,
+            config.WINDOW_HEIGHT - config.BATTLE_AIRSTRIKE_BUTTON_HEIGHT // 2 - 30,
+            config.BATTLE_AIRSTRIKE_BUTTON_WIDTH,
+            config.BATTLE_AIRSTRIKE_BUTTON_HEIGHT,
+            "GEFECHT STARTEN",
+            self._start_battle,
+        )
+
+    def _get_preview_bounds(self, ship, row, col, orientation):
+        coords = ship.get_coordinates_at(row, col, orientation)
+        min_row = min(r for r, _ in coords)
+        min_col = min(c for _, c in coords)
+        max_row = max(r for r, _ in coords)
+        max_col = max(c for _, c in coords)
+
+        x = self.player_board.x_offset + min_col * config.CELL_SIZE
+        y = self.player_board.y_offset + min_row * config.CELL_SIZE
+        width = (max_col - min_col + 1) * config.CELL_SIZE
+        height = (max_row - min_row + 1) * config.CELL_SIZE
+        return x, y, width, height
+
+    def _draw_ship_sprite_preview(self, screen):
+        if not self.preview_position or not self.selected_ship:
             return
 
-        # Berechne Vorschau-Position
-        cell_pos = self.player_board.get_cell_at_pos(mouse_pos[0], mouse_pos[1])
+        row, col = self.preview_position
+        source_image = _get_ship_image(theme_manager.current.name, self.selected_ship.name)
+        if source_image is None:
+            return
 
-        if cell_pos:
-            self.preview_position = cell_pos
-            # Pruefe ob Platzierung gueltig ist
-            self.placement_valid = self.player_board.can_place_ship(
-                self.current_ship, cell_pos[0], cell_pos[1], self.current_orientation
-            )
+        x, y, width, height = self._get_preview_bounds(self.selected_ship, row, col, self.current_orientation)
+        rotated = pygame.transform.rotate(source_image,
+                                          -90 * (self.current_orientation % self.selected_ship.get_rotation_count()))
+
+        content_rect = rotated.get_bounding_rect(min_alpha=1)
+        if content_rect.width > 0 and content_rect.height > 0:
+            rotated = rotated.subsurface(content_rect).copy()
+
+        scaled = pygame.transform.smoothscale(rotated, (max(1, width), max(1, height)))
+        alpha = 210 if self.placement_valid else 150
+        scaled.set_alpha(alpha)
+        screen.blit(scaled, (x, y))
+
+    def _pick_ship_from_board(self, pos):
+        """neues Placement für bereits plazierte Ships"""
+        cell_pos = self.player_board.get_cell_at_pos(pos[0], pos[1])
+        if not cell_pos:
+            return False
+
+        cell = self.player_board.get_cell(cell_pos[0], cell_pos[1])
+        if not cell or not cell.has_ship():
+            return False
+
+        picked_ship = cell.ship
+        self.player_board.remove_ship(picked_ship)
+        self.selected_ship = picked_ship
+        self.current_orientation = picked_ship.orientation
+        self.preview_position = cell_pos
+        return True
+
+    def update(self, dt, mouse_pos):
+        """Aktualisiert die Platzierungsphase"""
+        self.player_board.all_ships_placed = self._all_ships_placed()
+
+        if self.selected_ship:
+            cell_pos = self.player_board.get_cell_at_pos(mouse_pos[0], mouse_pos[1])
+            if cell_pos:
+                self.preview_position = cell_pos
+                self.placement_valid = self.player_board.can_place_ship(
+                    self.selected_ship, cell_pos[0], cell_pos[1], self.current_orientation
+                )
+            else:
+                self.preview_position = None
+                self.placement_valid = False
         else:
             self.preview_position = None
             self.placement_valid = False
 
+        self.start_button.update(dt, mouse_pos[0], mouse_pos[1])
+
     def on_mouse_down(self, pos, button):
         """Behandelt Mausklicks"""
-        if button == 1 and self.current_ship and self.preview_position and self.placement_valid:
-            # Platziere Schiff
-            row, col = self.preview_position
-            success = self.player_board.place_ship(
-                self.current_ship, row, col, self.current_orientation
-            )
+        if button != 1:
+            return
 
-            if success:
-                # Naechstes Schiff
-                self.current_ship_index += 1
-                if self.current_ship_index < len(self.ships_to_place):
-                    self.current_ship = self.ships_to_place[self.current_ship_index]
-                    self.current_orientation = config.ORIENTATION_HORIZONTAL
-                else:
-                    # Alle Schiffe platziert -> Starte Kampfphase
-                    self.player_board.all_ships_placed = True
-                    self._start_battle()
+        if self._all_ships_placed() and self.start_button.is_hovered(pos[0], pos[1]):
+            self.start_button.click()
+            return
+
+        for ship, item_rect in self.ship_list_item_rects:
+            if item_rect.collidepoint(pos):
+                if self._is_ship_placed(ship):
+                    self.player_board.remove_ship(ship)
+                self.selected_ship = ship
+                self.current_orientation = ship.orientation
+                return
+
+        if not self.selected_ship and self._pick_ship_from_board(pos):
+            return
+
+        if self.selected_ship and self.preview_position and self.placement_valid:
+            row, col = self.preview_position
+            if self.player_board.place_ship(self.selected_ship, row, col, self.current_orientation):
+                self.selected_ship = None
+                self.preview_position = None
+                self.placement_valid = False
+
 
     def on_key_down(self, key):
         """Behandelt Tasteneingaben"""
         # R-Taste: Rotation
-        if key == pygame.K_r and self.current_ship:
-            self.current_orientation = (
-                   self.current_orientation + 1
-            ) % self.current_ship.get_rotation_count()
+        if key == pygame.K_r and self.selected_ship:
+            self.current_orientation = (self.current_orientation + 1) % self.selected_ship.get_rotation_count()
 
     def _start_battle(self):
         """Startet die Kampfphase"""
+        if not self._all_ships_placed():
+            return
+
+        self.player_board.all_ships_placed = True
         self.game_manager.player_board = self.player_board
         self.game_manager.change_state(config.STATE_BATTLE)
 
@@ -124,27 +206,30 @@ class PlacementState(BaseState):
         )
 
         # Anleitung
-        if self.current_ship:
-            display_name = theme_manager.get_ship_display_name(self.current_ship.name)
-            instruction = f"AUSGEWÄHLTES SCHIFF: {display_name.upper()} (LÄNGE: {self.current_ship.get_size()})"
-            draw_text(
-                screen,
-                instruction,
-                config.WINDOW_WIDTH // 2,
-                panel_rect.bottom + 50,
-                config.PLACEMENT_INSTRUCTION_FONT_SIZE,
-                theme.color_text_secondary,
-                center=True,
-            )
-            draw_text(
-                screen,
-                theme.text_placement_instruction,
-                config.WINDOW_WIDTH // 2,
-                config.WINDOW_HEIGHT - config.PLACEMENT_INSTRUCTION_MARGIN_BOTTOM,
-                config.PLACEMENT_INSTRUCTION_FONT_SIZE,
-                theme.color_text_secondary,
-                center=True,
-            )
+        if self.selected_ship:
+            display_name = theme_manager.get_ship_display_name(self.selected_ship.name)
+            instruction = f"AUSGEWÄHLTES SCHIFF: {display_name.upper()} (LÄNGE: {self.selected_ship.get_size()})"
+        else:
+            instruction = "WÄHLE EIN SCHIFF AUS DER LISTE ODER KLICKE EIN SCHIFF AUF DEM FELD"
+
+        draw_text(
+            screen,
+            instruction,
+            config.WINDOW_WIDTH // 2,
+            panel_rect.bottom + 50,
+            config.PLACEMENT_INSTRUCTION_FONT_SIZE,
+            theme.color_text_secondary,
+            center=True,
+        )
+        draw_text(
+            screen,
+            "Linksklick: Schiff wählen/platzieren | R: rotieren",
+            config.WINDOW_WIDTH // 2,
+            config.WINDOW_HEIGHT - config.PLACEMENT_INSTRUCTION_MARGIN_BOTTOM,
+            config.PLACEMENT_INSTRUCTION_FONT_SIZE,
+            theme.color_text_secondary,
+            center=True,
+        )
 
         # Zeichne Spielfeld
         self._draw_board(screen)
@@ -158,7 +243,7 @@ class PlacementState(BaseState):
         )
         draw_rounded_rect(screen, (0, 0, 0), prog_rect, radius=15, alpha=150)
 
-        progress = f"SCHIFF {self.current_ship_index + 1} VON {len(self.ships_to_place)}"
+        progress = f"PLATZIERT: {len(self.player_board.ships)} VON {len(self.ships_to_place)}"
         draw_text(
             screen,
             progress,
@@ -170,7 +255,10 @@ class PlacementState(BaseState):
         )
 
         # Bereits platzierte Schiffe auflisten
-        self._draw_placed_ships_list(screen)
+        self._draw_ship_list(screen)
+
+        if self._all_ships_placed():
+            self.start_button.draw(screen, default_color=(30, 110, 70), hover_color=(50, 170, 100))
 
     def _draw_board(self, screen):
         """Zeichnet das Spielfeld mit Vorschau"""
@@ -197,20 +285,19 @@ class PlacementState(BaseState):
                 draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True)
 
         # Zeichne Vorschau
-        if self.preview_position and self.current_ship:
-            self._draw_ship_preview(screen)
+        if self.preview_position and self.selected_ship:
+            self._draw_ship_sprite_preview(screen)
 
     def _draw_ship_preview(self, screen):
         """Zeichnet die Schiffs-Vorschau"""
-        if not self.preview_position:
+        if not self.preview_position or not self.selected_ship:
             return
 
         row, col = self.preview_position
-        ship = self.current_ship
         color = (50, 255, 100) if self.placement_valid else (255, 50, 50)
 
         # Zeichne alle Zellen die das Schiff belegen wuerde
-        for preview_row, preview_col in ship.get_coordinates_at(row, col, self.current_orientation):
+        for preview_row, preview_col in self.selected_ship.get_coordinates_at(row, col, self.current_orientation):
 
             if 0 <= preview_row < config.GRID_SIZE and 0 <= preview_col < config.GRID_SIZE:
                 x = self.player_board.x_offset + preview_col * config.CELL_SIZE
@@ -225,8 +312,8 @@ class PlacementState(BaseState):
                 draw_rounded_rect(screen, color, rect, radius=4, alpha=150)
                 draw_rounded_rect(screen, color, rect, radius=4, width=2, alpha=255)
 
-    def _draw_placed_ships_list(self, screen):
-        """Zeichnet eine Liste der bereits platzierten Schiffe"""
+    def _draw_ship_list(self, screen):
+        """Zeichnet alle Schiffe als Liste"""
         x = config.PLACEMENT_SHIP_LIST_X
         y = config.WINDOW_HEIGHT - config.PLACEMENT_SHIP_LIST_MARGIN_BOTTOM
 
@@ -239,14 +326,32 @@ class PlacementState(BaseState):
         draw_rounded_rect(screen, (0, 0, 0), panel_rect, radius=15, alpha=150)
         draw_rounded_rect(screen, (50, 100, 150), panel_rect, radius=15, width=2, alpha=80)
 
-        draw_text(screen, "PLATZIERTE SCHIFFE", x, y, config.PLACEMENT_SHIP_LIST_TITLE_FONT_SIZE, (150, 200, 255))
+        draw_text(screen, "SCHIFFE", x, y, config.PLACEMENT_SHIP_LIST_TITLE_FONT_SIZE, (150, 200, 255))
 
-        for i, ship in enumerate(self.player_board.ships):
+        self.ship_list_item_rects = []
+        available_ships = [ship for ship in self.ships_to_place if not self._is_ship_placed(ship) and  ship != self.selected_ship]
+        for i, ship in enumerate(available_ships):
             y_offset = y + 50 + i * config.PLACEMENT_SHIP_LIST_ITEM_SPACING
+            item_rect = Rect(x-10, y_offset -8, config.PLACEMENT_SHIP_LIST_WIDTH - 60, 34)
+            draw_rounded_rect(screen, (80, 80, 100), item_rect, radius=8, alpha=120)
+
             display_name = theme_manager.get_ship_display_name(ship.name)
-            text = f"{display_name.upper()} hat den Hafen verlassen"
-            draw_text(screen, text, x, y_offset, config.PLACEMENT_SHIP_LIST_ITEM_FONT_SIZE, (100, 255, 150))
+            text = f"{display_name.upper()} [BEREIT]"
+            draw_text(screen, text, x, y_offset, config.PLACEMENT_SHIP_LIST_ITEM_FONT_SIZE, (230, 240, 255))
+
+            self.ship_list_item_rects.append((ship, item_rect))
+
+        if self.selected_ship:
+            draw_text(
+                screen,
+                "AKTIV: " + theme_manager.get_ship_display_name(self.selected_ship.name).upper(),
+                x,
+                y + config.PLACEMENT_SHIP_LIST_HEIGHT - 40,
+                config.PLACEMENT_SHIP_LIST_ITEM_FONT_SIZE,
+                (120, 220, 255),
+            )
 
     def on_resize(self, width, height):
         self.player_board.x_offset = config.PLAYER_GRID_X
         self.player_board.y_offset = config.GRID_OFFSET_Y
+        self.start_button = self._build_start_button()
