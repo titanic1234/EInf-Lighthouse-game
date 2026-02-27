@@ -8,6 +8,7 @@ from game.graphics import draw_gradient_background, GlowButton, draw_title_art
 from game.theme import theme_manager
 from game.states.base_state import BaseState
 import game.theme as theme
+import game.multiplayer.multiplayer_config as mconfig
 
 
 class MenuState(BaseState):
@@ -58,17 +59,28 @@ class MenuState(BaseState):
                 self._toggle_theme,
             )
         )
-
-        self.buttons.append(
-            GlowButton(
-                center_x,
-                start_y + config.MENU_BUTTON_SPACING * 2,
-                config.MENU_BUTTON_WIDTH,
-                config.MENU_BUTTON_HEIGHT,
-                "Multiplayer",
-                self._start_multiplayer,
+        if mconfig.CONNENCTION:
+            self.buttons.append(
+                GlowButton(
+                    center_x,
+                    start_y + config.MENU_BUTTON_SPACING * 2,
+                    config.MENU_BUTTON_WIDTH,
+                    config.MENU_BUTTON_HEIGHT,
+                    "Multiplayer",
+                    self._start_multiplayer,
+                )
             )
-        )
+        else:
+            self.buttons.append(
+                GlowButton(
+                    center_x,
+                    start_y + config.MENU_BUTTON_SPACING * 2,
+                    config.MENU_BUTTON_WIDTH,
+                    config.MENU_BUTTON_HEIGHT,
+                    "Multiplayer (Offline)",
+                    self._do_nothing,
+                )
+            )
 
         # "Beenden" Button
         self.buttons.append(
@@ -81,6 +93,8 @@ class MenuState(BaseState):
                 self._quit_game,
             )
         )
+
+        print(self.buttons)
 
     def _toggle_theme(self):
         theme_manager.toggle()
@@ -96,6 +110,9 @@ class MenuState(BaseState):
         """Gehe ins Multiplayer-Menu"""
         self.game_manager.change_state(config.STATE_MULTIPLAYER_MENU)
 
+    def _do_nothing(self):
+        pass
+
     def _quit_game(self):
         """Beendet das Spiel"""
         import sys
@@ -106,6 +123,17 @@ class MenuState(BaseState):
         mouse_x, mouse_y = mouse_pos
         for button in self.buttons:
             button.update(dt, mouse_x, mouse_y)
+
+
+        if mconfig.CONNENCTION and self.buttons[2].text == "Multiplayer (Offline)":
+            self.buttons[2].text = "Multiplayer"
+            self.buttons[2].action = self._start_multiplayer
+
+        elif not mconfig.CONNENCTION and self.buttons[2].text == "Multiplayer":
+            self.buttons[2].text = "Multiplayer (Offline)"
+            self.buttons[2].action = self._do_nothing
+
+
 
     def on_mouse_down(self, pos, button):
         """Behandelt Mausklicks"""
