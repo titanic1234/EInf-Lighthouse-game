@@ -20,6 +20,8 @@ class Cell:
         self.col = col
         self.status = CELL_EMPTY
         self.ship = None  # Referenz zum Schiff, falls vorhanden
+        self.scan_marked = False
+        self.napalm_marked = False
 
     def has_ship(self):
         """Prüft, ob die Zelle ein Schiff enthält"""
@@ -52,6 +54,9 @@ class Cell:
         if self.is_shot():
             return False  # Bereits beschossen
 
+        self.scan_marked = False
+        self.napalm_marked = False
+
         if self.has_ship():
             self.status = CELL_HIT
             self.ship.hit()
@@ -68,6 +73,8 @@ class Cell:
         """Setzt die Zelle zurück"""
         self.status = CELL_EMPTY
         self.ship = None
+        self.scan_marked = False
+        self.napalm_marked = False
 
     def __repr__(self):
         status_symbols = {

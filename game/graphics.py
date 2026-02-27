@@ -12,6 +12,36 @@ from game.theme import theme_manager
 _SHIP_IMAGE_CACHE = {}
 _SHIP_RENDER_CACHE = {}
 
+_THEME_STATUS_ICON_MAP = {
+    "MODERN": {
+        "napalm": "napalm.png",
+    },
+    "PIRATE": {
+        "napalm": "griechisches_feuer.png",
+    },
+}
+
+_STATUS_ICON_CACHE = {}
+
+
+def _get_status_icon(icon_name):
+    theme_name = theme_manager.current.name
+    filename = _THEME_STATUS_ICON_MAP.get(theme_name, {}).get(icon_name)
+    if not filename:
+        return None
+
+    cache_key = (theme_name, icon_name)
+    if cache_key not in _STATUS_ICON_CACHE:
+        icon_path = os.path.join("images", filename)
+        if not os.path.exists(icon_path):
+            return None
+        try:
+            _STATUS_ICON_CACHE[cache_key] = pygame.image.load(icon_path).convert_alpha()
+        except pygame.error:
+            return None
+
+    return _STATUS_ICON_CACHE[cache_key]
+
 _THEME_SHIP_IMAGE_MAP = {
     "MODERN": {
         "Schlachtschiff": "Schlachtschiff(5x1).png",
@@ -196,6 +226,21 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True):
                          5)
         pygame.draw.line(screen, (255, 220, 120), (x + config.CELL_SIZE - 6, y + 6), (x + 6, y + config.CELL_SIZE - 6),
                          5)
+
+    if cell.scan_marked and not cell.is_shot():
+        center = (x + config.CELL_SIZE // 2, y + config.CELL_SIZE // 2)
+        pygame.draw.circle(screen, (130, 255, 255), center, 10, 2)
+        pygame.draw.circle(screen, (130, 255, 255), center, 3)
+
+    if cell.napalm_marked and not cell.is_shot():
+        icon = _get_status_icon("napalm")
+        if icon:
+            size = config.CELL_SIZE - 14
+            icon_surf = pygame.transform.smoothscale(icon, (size, size))
+            icon_rect = icon_surf.get_rect(center=cell_rect.center)
+            screen.blit(icon_surf, icon_rect)
+        else:
+            pygame.draw.circle(screen, (255, 180, 40), cell_rect.center, 12, 2)
 
     # Grid-Linien (Subtle)
     grid_color = theme.color_grid_player if not is_enemy else theme.color_grid_enemy
