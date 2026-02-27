@@ -38,6 +38,6 @@ def _start_check_connection_thread():
 def create_game(payload: CreateGame):
     """Creates a new game on the multiplayer server."""
     response = requests.post(mconfig.MULTIPLAYER_SERVER_URL + "games", json=payload.model_dump())
-    print(response.json())
     response = response.json()
+    print(response)
     mconfig.change_vars(code=response["code"], player_token=response["player_token"], role=response["role"], name=payload.name)
