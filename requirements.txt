@@ -1,3 +1,4 @@
 pgzero
 pillow
 pydantic
+requests

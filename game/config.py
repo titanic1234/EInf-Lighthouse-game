@@ -3,6 +3,8 @@ Spielkonfiguration fuer Schiffe-Versenken
 Enthaelt alle Konstanten, Farben und Spielregeln
 """
 
+MULTIPLAYER_SERVER_URL = "http://127.0.0.1:8000/"
+
 # Fenster
 WINDOW_WIDTH = 1920
 WINDOW_HEIGHT = 1080
