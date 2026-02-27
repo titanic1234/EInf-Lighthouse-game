@@ -85,6 +85,16 @@ class BattleState(BaseState):
             rect = pygame.Rect(start_x + idx * (size + spacing), y, size, size)
             self.ability_buttons.append((name, rect))
 
+    def _ability_display_name(self, ability_key):
+        is_modern = theme_manager.current.name == "MODERN"
+        names = {
+            "airstrike": "LUFTSCHLAG" if is_modern else "BREITSEITE",
+            "guided": "LENKRAKETE" if is_modern else "ENTERHAKEN",
+            "sonar": "SONAR" if is_modern else "KRÄHENNEST",
+            "napalm": "NAPALM" if is_modern else "GRIECHISCHES FEUER",
+        }
+        return names.get(ability_key, "SPEZIALFÄHIGKEIT")
+
     def _activate_ability(self, name):
         if not self.player_turn or self.abilities[name]["charges"] <= 0:
             return
@@ -95,9 +105,9 @@ class BattleState(BaseState):
 
         self.selected_ability = name
         label = {
-            "airstrike": "LUFTSCHLAG/BREITSEITE AKTIV (+)",
-            "sonar": "SONAR/KRÄHENNEST AKTIV (3x3)",
-            "napalm": "NAPALM/GRIECHISCHES FEUER AKTIV",
+            "airstrike": f"{self._ability_display_name('airstrike')} AKTIV (+)",
+            "sonar": f"{self._ability_display_name('sonar')} AKTIV (3x3)",
+            "napalm": f"{self._ability_display_name('napalm')} AKTIV",
         }
         self.message = label.get(name, "SPEZIALFÄHIGKEIT AKTIV")
 
@@ -223,8 +233,8 @@ class BattleState(BaseState):
                 if cell and cell.has_ship() and not cell.is_shot():
                     candidates.append((row, col))
 
-        if not candidates:
-            self.message = "KEIN GÜLTIGES ZIEL FÜR LENKRAKETE/ENTERHAKEN"
+        if not candidates: # sollte nicht passieren
+            self.message = f"KEIN GÜLTIGES ZIEL FÜR {self._ability_display_name('guided')}"
             return
 
         row, col = random.choice(candidates)
@@ -237,9 +247,9 @@ class BattleState(BaseState):
             self.game_manager.shots_hit += 1
 
         if destroyed:
-            self.message = "LENKRAKETE/ENTERHAKEN: SCHIFFSTEIL ZERSTÖRT UND ZIEL VERSENKT!"
+            self.message = f"{self._ability_display_name('guided')}: ZIEL VERSENKT!"
         else:
-            self.message = f"LENKRAKETE/ENTERHAKEN HAT BEI ({row + 1}, {col + 1}) GETROFFEN!"
+            self.message = f"{self._ability_display_name('guided')} HAT BEI ({row + 1}, {col + 1}) GETROFFEN!"
 
         self._check_game_over_after_player_action(hit)
 
@@ -260,9 +270,11 @@ class BattleState(BaseState):
 
         if found_positions:
             coords_text = ", ".join(f"({r},{c})" for r, c in found_positions)
-            self.message = f"SONAR/KRÄHENNEST KONTAKTE: {coords_text}"
+            self.message = f"{self._ability_display_name('sonar')} KONTAKTE: {coords_text}"
         else:
-            self.message = "SONAR/KRÄHENNEST: KEINE SCHIFFSKONTAKTE IM 3x3 BEREICH"
+            self.message = f"{self._ability_display_name('sonar')}: KEINE SCHIFFE GESICHTET"
+
+        self._check_game_over_after_player_action(False, force_end_turn=True, preserve_message=True)
 
     def _player_napalm(self, row, col):
         self.abilities["napalm"]["charges"] = 0
@@ -277,11 +289,11 @@ class BattleState(BaseState):
         self.active_fires.append(fire)
 
         if hit:
-            self.message = "NAPALM/GRIECHISCHES FEUER ENTZÜNDET - TREFFER!"
+            self.message = f"{self._ability_display_name('napalm')} ENTZÜNDET - TREFFER!"
         else:
-            self.message = "NAPALM/GRIECHISCHES FEUER ENTZÜNDET"
+            self.message = f"{self._ability_display_name('napalm')} ENTZÜNDET"
 
-        self._check_game_over_after_player_action(hit)
+        self._check_game_over_after_player_action(hit, force_end_turn=True, preserve_message=True)
 
     def _progress_fires(self):
         if not self.active_fires:
@@ -338,7 +350,7 @@ class BattleState(BaseState):
 
         self._check_game_over_after_player_action(hit)
 
-    def _check_game_over_after_player_action(self, hit):
+    def _check_game_over_after_player_action(self, hit, force_end_turn=False, preserve_message=False):
         fire_hit = self._progress_fires()
         any_hit = hit or fire_hit
 
@@ -348,9 +360,12 @@ class BattleState(BaseState):
             self._end_game()
             return
 
-        if not any_hit:
+        if force_end_turn or not any_hit:
             self.player_turn = False
-            self.message = theme_manager.current.text_computer_turn
+            if preserve_message:
+                self.message = f"{self.message} - {theme_manager.current.text_computer_turn}"
+            else:
+                self.message = theme_manager.current.text_computer_turn
 
     def _computer_turn(self):
         """Computer macht seinen Zug"""
