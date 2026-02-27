@@ -4,10 +4,18 @@ Verwaltet alle Spielzustände (States) und koordiniert das Spiel
 """
 
 from game.config import STATE_MENU, STATE_PLACEMENT, STATE_BATTLE, STATE_GAME_OVER
+from game.config import (
+    STATE_MULTIPLAYER_MENU,
+    STATE_MULTIPLAYER_WAITING,
+    STATE_MULTIPLAYER_GAME,
+    STATE_MULTIPLAYER_CREATE,
+    STATE_MULTIPLAYER_JOIN
+)
 from game.states.menu import MenuState
 from game.states.placement import PlacementState
 from game.states.battle import BattleState
 from game.states.game_over import GameOverState
+from game.states.multiplayer import MultiplayerState
 
 
 class GameManager:
@@ -18,6 +26,9 @@ class GameManager:
         STATE_PLACEMENT: PlacementState,
         STATE_BATTLE: BattleState,
         STATE_GAME_OVER: GameOverState,
+        STATE_MULTIPLAYER_MENU: MultiplayerState,
+
+
     }
 
     def __init__(self):

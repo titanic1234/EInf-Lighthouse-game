@@ -1,7 +1,3 @@
-"""
-Hauptmenue-State mit aufgewerteter UI
-"""
-
 import pygame
 import game.config as config
 from game.graphics import draw_gradient_background, GlowButton, draw_title_art
@@ -10,12 +6,12 @@ from game.states.base_state import BaseState
 import game.theme as theme
 
 
-class MenuState(BaseState):
-    """Hauptmenue-State"""
 
+class MultiplayerState(BaseState):
+    """Multiplayer-State"""
     def __init__(self, game_manager):
         """
-        Initialisiert das Menue
+        Initialisiert die Multiplayer-Seite
 
         Args:
             game_manager: Referenz zum GameManager
@@ -24,16 +20,13 @@ class MenuState(BaseState):
         self.buttons = []
         self._create_buttons()
 
+
     def _create_buttons(self):
         """Erstellt die Menue-Buttons"""
         center_x = config.WINDOW_WIDTH // 2
         start_y = config.MENU_BUTTON_Y
         theme = theme_manager.current
-        self.toggle_text = ""
-        if theme.name == "MODERN":
-            self.toggle_text = "PIRATEN MODUS"
-        else:
-            self.toggle_text = "CLASSIC MODUS"
+
 
         # "Neues Spiel" Button
         self.buttons.append(
@@ -42,31 +35,20 @@ class MenuState(BaseState):
                 start_y,
                 config.MENU_BUTTON_WIDTH,
                 config.MENU_BUTTON_HEIGHT,
-                theme.text_start_btn,
-                self._start_game,
+                "Create Game",
+                self._create_game,
             )
         )
 
-        # "Theme" Button
+        # "Neues Spiel" Button
         self.buttons.append(
             GlowButton(
                 center_x,
                 start_y + config.MENU_BUTTON_SPACING * 1,
                 config.MENU_BUTTON_WIDTH,
                 config.MENU_BUTTON_HEIGHT,
-                self.toggle_text, #Button Text
-                self._toggle_theme,
-            )
-        )
-
-        self.buttons.append(
-            GlowButton(
-                center_x,
-                start_y + config.MENU_BUTTON_SPACING * 2,
-                config.MENU_BUTTON_WIDTH,
-                config.MENU_BUTTON_HEIGHT,
-                "Multiplayer",
-                self._start_multiplayer,
+                "Join Game",
+                self._join_game,
             )
         )
 
@@ -74,11 +56,11 @@ class MenuState(BaseState):
         self.buttons.append(
             GlowButton(
                 center_x,
-                start_y + config.MENU_BUTTON_SPACING * 3,
+                start_y + config.MENU_BUTTON_SPACING * 2,
                 config.MENU_BUTTON_WIDTH,
                 config.MENU_BUTTON_HEIGHT,
-                theme.text_quit_btn,
-                self._quit_game,
+                "Menu",
+                self._back_menu,
             )
         )
 
@@ -88,18 +70,17 @@ class MenuState(BaseState):
         self.buttons = []
         self._create_buttons()
 
-    def _start_game(self):
-        """Startet ein neues Spiel"""
-        self.game_manager.change_state(config.STATE_PLACEMENT)
+    def _back_menu(self):
+        """Zurück ins Menu"""
+        self.game_manager.change_state(config.STATE_MENU)
 
-    def _start_multiplayer(self):
-        """Gehe ins Multiplayer-Menu"""
-        self.game_manager.change_state(config.STATE_MULTIPLAYER_MENU)
+    def _create_game(self):
+        self.game_manager.change_state(config.STATE_MULTIPLAYER_CREATE)
 
-    def _quit_game(self):
-        """Beendet das Spiel"""
-        import sys
-        sys.exit()
+    def _join_game(self):
+        self.game_manager.change_state(config.STATE_MULTIPLAYER_JOIN)
+
+
 
     def update(self, dt, mouse_pos):
         """Aktualisiert das Menue"""

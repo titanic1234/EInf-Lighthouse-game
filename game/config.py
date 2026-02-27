@@ -49,11 +49,18 @@ SHIP_TYPES = [
     ("Flugzeugträger", 5, 1, "carrier_l")
 ]
 
-# Spielzustaende
+# Spielzustände
 STATE_MENU = "menu"
 STATE_PLACEMENT = "placement"
 STATE_BATTLE = "battle"
 STATE_GAME_OVER = "game_over"
+
+# Zusatz: Spielzustände Multiplayer
+STATE_MULTIPLAYER_MENU = "multiplayer_menu"
+STATE_MULTIPLAYER_WAITING = "multiplayer_waiting"
+STATE_MULTIPLAYER_GAME = "multiplayer_game"
+STATE_MULTIPLAYER_CREATE = "multiplayer_create"
+STATE_MULTIPLAYER_JOIN = "multiplayer_join"
 
 # Zell-Status
 CELL_EMPTY = 0
@@ -76,7 +83,7 @@ FONT_SIZE_SMALL = 18
 MENU_BUTTON_WIDTH = 400
 MENU_BUTTON_HEIGHT = 80
 MENU_BUTTON_Y = 650
-MENU_BUTTON_SPACING = 120
+MENU_BUTTON_SPACING = 110
 MENU_TITLE_FONT_SIZE = 120
 MENU_SUBTITLE_FONT_SIZE = 60
 MENU_INFO_FONT_SIZE = 24
