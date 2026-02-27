@@ -8,6 +8,7 @@ from game.graphics import draw_gradient_background, GlowButton, draw_title_art
 from game.theme import theme_manager
 from game.states.base_state import BaseState
 import game.theme as theme
+import game.multiplayer.communication as mconfig
 
 
 class MenuState(BaseState):
@@ -58,7 +59,7 @@ class MenuState(BaseState):
                 self._toggle_theme,
             )
         )
-        if config.CONNENCTION:
+        if mconfig.CONNENCTION:
             self.buttons.append(
                 GlowButton(
                     center_x,
@@ -124,11 +125,11 @@ class MenuState(BaseState):
             button.update(dt, mouse_x, mouse_y)
 
 
-        if config.CONNENCTION and self.buttons[2].text == "Multiplayer (Offline)":
+        if mconfig.CONNENCTION and self.buttons[2].text == "Multiplayer (Offline)":
             self.buttons[2].text = "Multiplayer"
             self.buttons[2].action = self._start_multiplayer
 
-        elif not config.CONNENCTION and self.buttons[2].text == "Multiplayer":
+        elif not mconfig.CONNENCTION and self.buttons[2].text == "Multiplayer":
             self.buttons[2].text = "Multiplayer (Offline)"
             self.buttons[2].action = self._do_nothing
 
