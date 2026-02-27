@@ -3,6 +3,7 @@ import os
 import random
 import pygame
 import game.config as config
+from game.config import CELL_SIZE
 from game.entities import ship
 from game.ui.buttons import BaseButton
 from game.theme import theme_manager
@@ -72,11 +73,32 @@ def _draw_ship_cell_image(screen, x, y, cell):
     if local_row < 0 or local_col < 0 or local_row >= grid_height or local_col >= grid_width:
         return False
 
-    source_image = _get_ship_image(theme_manager.current.name, ship.name)
-    if source_image is None:
+    transformed = _get_transformed_ship_surface(
+        ship,
+        grid_width,
+        grid_height,
+        ship.orientation,
+        ship_coords=coords,
+    )
+    if transformed is None:
         return False
 
-    orientation_steps = ship.orientation % ship.get_rotation_count()
+    area = pygame.Rect(
+        local_col * config.CELL_SIZE,
+        local_row * config.CELL_SIZE,
+        config.CELL_SIZE,
+        config.CELL_SIZE,
+    )
+    screen.blit(transformed, (x, y), area=area)
+    return True
+
+
+def _get_transformed_ship_surface(ship, grid_width, grid_height, orientation, ship_coords=None):
+    source_image = _get_ship_image(theme_manager.current.name, ship.name)
+    if source_image is None:
+        return None
+
+    orientation_steps = orientation % ship.get_rotation_count()
     render_key = (
         theme_manager.current.name,
         ship.name,
@@ -86,16 +108,14 @@ def _draw_ship_cell_image(screen, x, y, cell):
         config.CELL_SIZE,
     )
     transformed = _SHIP_RENDER_CACHE.get(render_key)
-    if transformed is None:
-        """Resized das bild um besser in die Kästchen zu passen.
-        nutzt eine Länge voll aus und passt die andere an, um min 50% auszufüllen (50% vermindert warp)"""
-        rotated = pygame.transform.rotate(source_image, -90 * orientation_steps)
+    if transformed is not None:
+        return transformed
 
-        # Transparente Randpixel entfernen
-        content_rect = rotated.get_bounding_rect(min_alpha=1)
-        if content_rect.width > 0 and content_rect.height > 0:
-            rotated = rotated.subsurface(content_rect).copy()
+    rotated = pygame.transform.rotate(source_image, -90 * orientation_steps)
 
+    content_rect = rotated.get_bounding_rect(min_alpha=1)
+    if content_rect.width > 0 and content_rect.height > 0:
+        rotated = rotated.subsurface(content_rect).copy()
         target_width = grid_width * config.CELL_SIZE
         target_height = grid_height * config.CELL_SIZE
         source_width, source_height = rotated.get_size()
@@ -112,11 +132,12 @@ def _draw_ship_cell_image(screen, x, y, cell):
 
         scaled_ship = pygame.transform.smoothscale(rotated, (scaled_width, scaled_height))
         transformed = pygame.Surface((target_width, target_height), pygame.SRCALPHA)
-
-        # Für L-Carrier verschieben, damit langer/kurzer Schenkel optisch besser auf der Form liegen.
         offset_x = (target_width - scaled_width) // 2
         offset_y = (target_height - scaled_height) // 2
         if ship.shape == "carrier_l":
+            coords = ship_coords if ship_coords else ship.get_coordinates_at(0, 0, orientation)
+            min_row = min(r for r, _ in coords)
+            min_col = min(c for _, c in coords)
             local_rows = [r - min_row for r, _ in coords]
             local_cols = [c - min_col for _, c in coords]
             avg_row = sum(local_rows) / len(local_rows)
@@ -128,20 +149,13 @@ def _draw_ship_cell_image(screen, x, y, cell):
             offset_x += col_bias_px
             offset_y += row_bias_px
 
+
         offset_x = max(0, min(offset_x, target_width - scaled_width))
         offset_y = max(0, min(offset_y, target_height - scaled_height))
 
         transformed.blit(scaled_ship, (offset_x, offset_y))
         _SHIP_RENDER_CACHE[render_key] = transformed
-
-    area = pygame.Rect(
-        local_col * config.CELL_SIZE,
-        local_row * config.CELL_SIZE,
-        config.CELL_SIZE,
-        config.CELL_SIZE,
-    )
-    screen.blit(transformed, (x, y), area=area)
-    return True
+        return transformed
 
 
 def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True):

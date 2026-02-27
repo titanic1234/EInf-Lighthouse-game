@@ -8,7 +8,14 @@ from pygame import Rect
 import game.config as config
 from game.entities.board import Board
 from game.entities.ship import Ship
-from game.graphics import draw_gradient_background, draw_rounded_rect, draw_text, draw_grid_cell, GlowButton, _get_ship_image
+from game.graphics import (
+    draw_gradient_background,
+    draw_rounded_rect,
+    draw_text,
+    draw_grid_cell,
+    GlowButton,
+    _get_transformed_ship_surface,
+)
 from game.theme import theme_manager
 from game.states.base_state import BaseState
 
@@ -30,14 +37,23 @@ class PlacementState(BaseState):
         self.ships_to_place = []
         self._create_ships()
 
-        self.selected_ship = self.ships_to_place[0] if self.ships_to_place else None
-        self.current_orientation = self.selected_ship.orientation if self.selected_ship else config.ORIENTATION_HORIZONTAL
+        self.selected_ship = None
+        self.current_orientation = config.ORIENTATION_HORIZONTAL
 
         self.preview_position = None  # (row, col) für Vorschau
         self.placement_valid = False
 
         self.ship_list_item_rects = []
+        self.mouse_pos = (0, 0)
         self.start_button = self._build_start_button()
+
+    def _get_ship_bounds(self, ship, row, col, orientation):
+        coords = ship.get_coordinates_at(row, col, orientation)
+        min_row = min(r for r, _ in coords)
+        min_col = min(c for _, c in coords)
+        max_row = max(r for r, _ in coords)
+        max_col = max(c for _, c in coords)
+        return min_row, min_col, max_row, max_col
 
     def _create_ships(self):
         """Erstellt alle Schiffe die platziert werden muessen"""
@@ -65,11 +81,7 @@ class PlacementState(BaseState):
         )
 
     def _get_preview_bounds(self, ship, row, col, orientation):
-        coords = ship.get_coordinates_at(row, col, orientation)
-        min_row = min(r for r, _ in coords)
-        min_col = min(c for _, c in coords)
-        max_row = max(r for r, _ in coords)
-        max_col = max(c for _, c in coords)
+        min_row, min_col, max_row, max_col = self._get_ship_bounds(ship, row, col, orientation)
 
         x = self.player_board.x_offset + min_col * config.CELL_SIZE
         y = self.player_board.y_offset + min_row * config.CELL_SIZE
@@ -78,26 +90,40 @@ class PlacementState(BaseState):
         return x, y, width, height
 
     def _draw_ship_sprite_preview(self, screen):
-        if not self.preview_position or not self.selected_ship:
+        if not self.selected_ship:
             return
 
-        row, col = self.preview_position
-        source_image = _get_ship_image(theme_manager.current.name, self.selected_ship.name)
-        if source_image is None:
+        """Snapping wenn maus auf grid, sonst frei"""
+        if self.preview_position:
+            row, col = self.preview_position
+            min_row, min_col, max_row, max_col = self._get_ship_bounds(self.selected_ship, row, col, self.current_orientation)
+            grid_width = max_col - min_col + 1
+            grid_height = max_row - min_row + 1
+            x, y, _, _ = self._get_preview_bounds(self.selected_ship, row, col, self.current_orientation)
+            ship_coords = self.selected_ship.get_coordinates_at(row, col, self.current_orientation)
+        else:
+            min_row, min_col, max_row, max_col = self._get_ship_bounds(self.selected_ship, 0, 0, self.current_orientation)
+            grid_width = max_col - min_col + 1
+            grid_height = max_row - min_row + 1
+            width = grid_width * config.CELL_SIZE
+            height = grid_height * config.CELL_SIZE
+            x = self.mouse_pos[0] - width // 2
+            y = self.mouse_pos[1] - height // 2
+            ship_coords = self.selected_ship.get_coordinates_at(0, 0, self.current_orientation)
+
+        transformed = _get_transformed_ship_surface(
+            self.selected_ship,
+            grid_width,
+            grid_height,
+            self.current_orientation,
+            ship_coords=ship_coords,
+        )
+        if transformed is None:
             return
 
-        x, y, width, height = self._get_preview_bounds(self.selected_ship, row, col, self.current_orientation)
-        rotated = pygame.transform.rotate(source_image,
-                                          -90 * (self.current_orientation % self.selected_ship.get_rotation_count()))
-
-        content_rect = rotated.get_bounding_rect(min_alpha=1)
-        if content_rect.width > 0 and content_rect.height > 0:
-            rotated = rotated.subsurface(content_rect).copy()
-
-        scaled = pygame.transform.smoothscale(rotated, (max(1, width), max(1, height)))
-        alpha = 210 if self.placement_valid else 150
-        scaled.set_alpha(alpha)
-        screen.blit(scaled, (x, y))
+        preview_surface = transformed.copy()
+        preview_surface.set_alpha(210 if self.placement_valid else 130)
+        screen.blit(preview_surface, (x, y))
 
     def _pick_ship_from_board(self, pos):
         """neues Placement für bereits plazierte Ships"""
@@ -119,6 +145,7 @@ class PlacementState(BaseState):
     def update(self, dt, mouse_pos):
         """Aktualisiert die Platzierungsphase"""
         self.player_board.all_ships_placed = self._all_ships_placed()
+        self.mouse_pos = mouse_pos
 
         if self.selected_ship:
             cell_pos = self.player_board.get_cell_at_pos(mouse_pos[0], mouse_pos[1])
@@ -285,7 +312,7 @@ class PlacementState(BaseState):
                 draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True)
 
         # Zeichne Vorschau
-        if self.preview_position and self.selected_ship:
+        if self.selected_ship:
             self._draw_ship_sprite_preview(screen)
 
     def _draw_ship_preview(self, screen):
@@ -313,43 +340,44 @@ class PlacementState(BaseState):
                 draw_rounded_rect(screen, color, rect, radius=4, width=2, alpha=255)
 
     def _draw_ship_list(self, screen):
-        """Zeichnet alle Schiffe als Liste"""
-        x = config.PLACEMENT_SHIP_LIST_X
-        y = config.WINDOW_HEIGHT - config.PLACEMENT_SHIP_LIST_MARGIN_BOTTOM
+        """Zeichnet Sprites aller Schiffe"""
+        x = self.player_board.x_offset + config.GRID_SIZE * config.CELL_SIZE + 50
+        y = self.player_board.y_offset + 10
 
-        panel_rect = Rect(
-            x - 20,
-            y - 20,
-            config.PLACEMENT_SHIP_LIST_WIDTH,
-            config.PLACEMENT_SHIP_LIST_HEIGHT,
-        )
-        draw_rounded_rect(screen, (0, 0, 0), panel_rect, radius=15, alpha=150)
-        draw_rounded_rect(screen, (50, 100, 150), panel_rect, radius=15, width=2, alpha=80)
-
-        draw_text(screen, "SCHIFFE", x, y, config.PLACEMENT_SHIP_LIST_TITLE_FONT_SIZE, (150, 200, 255))
+        draw_text(screen, "SCHIFFE", x, y - 36, config.PLACEMENT_SHIP_LIST_TITLE_FONT_SIZE, (150, 200, 255))
 
         self.ship_list_item_rects = []
-        available_ships = [ship for ship in self.ships_to_place if not self._is_ship_placed(ship) and  ship != self.selected_ship]
-        for i, ship in enumerate(available_ships):
-            y_offset = y + 50 + i * config.PLACEMENT_SHIP_LIST_ITEM_SPACING
-            item_rect = Rect(x-10, y_offset -8, config.PLACEMENT_SHIP_LIST_WIDTH - 60, 34)
-            draw_rounded_rect(screen, (80, 80, 100), item_rect, radius=8, alpha=120)
-
-            display_name = theme_manager.get_ship_display_name(ship.name)
-            text = f"{display_name.upper()} [BEREIT]"
-            draw_text(screen, text, x, y_offset, config.PLACEMENT_SHIP_LIST_ITEM_FONT_SIZE, (230, 240, 255))
-
-            self.ship_list_item_rects.append((ship, item_rect))
-
-        if self.selected_ship:
-            draw_text(
-                screen,
-                "AKTIV: " + theme_manager.get_ship_display_name(self.selected_ship.name).upper(),
-                x,
-                y + config.PLACEMENT_SHIP_LIST_HEIGHT - 40,
-                config.PLACEMENT_SHIP_LIST_ITEM_FONT_SIZE,
-                (120, 220, 255),
+        available_ships = [ship for ship in self.ships_to_place if not self._is_ship_placed(ship)]
+        cursor_y = y
+        for ship in available_ships:
+            coords = ship.get_coordinates_at(0, 0, ship.orientation)
+            min_row, min_col, max_row, max_col = self._get_ship_bounds(ship, 0, 0, ship.orientation)
+            grid_width = max_col - min_col + 1
+            grid_height = max_row - min_row + 1
+            sprite = _get_transformed_ship_surface(
+                ship,
+                grid_width,
+                grid_height,
+                ship.orientation,
+                ship_coords=coords,
             )
+            if sprite is None:
+                continue
+
+            sprite_width = sprite.get_width()
+            sprite_height = sprite.get_height()
+            sprite_x = x
+            sprite_y = cursor_y
+
+            if ship == self.selected_ship:
+                highlight_rect = Rect(sprite_x - 6, sprite_y - 6, sprite_width + 12, sprite_height + 12)
+                draw_rounded_rect(screen, (80, 180, 255), highlight_rect, radius=8, width=2, alpha=160)
+
+            screen.blit(sprite, (sprite_x, sprite_y))
+
+            item_rect = Rect(sprite_x, sprite_y, sprite_width, sprite_height)
+            self.ship_list_item_rects.append((ship, item_rect))
+            cursor_y += sprite_height + 24
 
     def on_resize(self, width, height):
         self.player_board.x_offset = config.PLAYER_GRID_X
