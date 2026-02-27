@@ -9,6 +9,9 @@ CHECK_CONNECTION = True
 CHECK_CONNECTION_ACTIVE = False
 
 
+GAME_STATE = None
+
+
 
 CODE: str | None = None
 NAME: str | None = None

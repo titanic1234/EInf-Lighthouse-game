@@ -8,7 +8,7 @@ from game.graphics import draw_gradient_background, GlowButton, draw_title_art
 from game.theme import theme_manager
 from game.states.base_state import BaseState
 import game.theme as theme
-import game.multiplayer.communication as mconfig
+import game.multiplayer.multiplayer_config as mconfig
 
 
 class MenuState(BaseState):
