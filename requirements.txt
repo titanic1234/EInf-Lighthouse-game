@@ -1,4 +1,5 @@
 pgzero
 pillow
 pydantic
+websocket-client
 requests

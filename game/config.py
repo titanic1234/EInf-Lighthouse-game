@@ -4,6 +4,10 @@ Enthaelt alle Konstanten, Farben und Spielregeln
 """
 
 MULTIPLAYER_SERVER_URL = "http://127.0.0.1:8000/"
+CONNENCTION = False
+CHECK_CONNECTION_INTERVAL = 5
+CHECK_CONNECTION = True
+CHECK_CONNECTION_ACTIVE = False
 
 # Fenster
 WINDOW_WIDTH = 1920
@@ -164,3 +168,15 @@ def update_fullscreen(enabled=False, changed=False):
 
 
 update_layout(WINDOW_WIDTH, WINDOW_HEIGHT)
+
+
+def connection_status(status: bool):
+    global CONNENCTION
+    CONNENCTION = status
+
+
+def check_connection(status: bool = CHECK_CONNECTION, check: bool = CHECK_CONNECTION_ACTIVE, interval: int = CHECK_CONNECTION_INTERVAL):
+    global CHECK_CONNECTION, CHECK_CONNECTION_INTERVAL, CHECK_CONNECTION_ACTIVE
+    CHECK_CONNECTION = status
+    CHECK_CONNECTION_INTERVAL = interval
+    CHECK_CONNECTION_ACTIVE = check

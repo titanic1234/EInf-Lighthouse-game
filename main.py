@@ -2,12 +2,15 @@ import pgzrun
 import pygame
 import game.config as config
 from game.game_manager import GameManager
+from game.multiplayer.communication import _start_check_connection_thread
 global WIDTH, HEIGHT
 WIDTH = config.WINDOW_WIDTH
 HEIGHT = config.WINDOW_HEIGHT
 TITLE = config.TITLE
 DISPLAY_FLAGS = pygame.RESIZABLE if config.WINDOW_RESIZABLE else 0
 
+
+_start_check_connection_thread()
 
 game_manager = GameManager()
 

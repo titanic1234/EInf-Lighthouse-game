@@ -7,7 +7,7 @@ import game.theme as theme
 
 from game.multiplayer.schemas import *
 
-from game.multiplayer.createGame import createGame
+from game.multiplayer.communication import create_game
 
 
 
@@ -79,7 +79,7 @@ class MultiplayerState(BaseState):
         self.game_manager.change_state(config.STATE_MENU)
 
     def _create_game(self):
-        createGame(CreateGame(name="Test"))
+        create_game(CreateGame(name="Test"))
         #self.game_manager.change_state(config.STATE_MULTIPLAYER_CREATE)
 
     def _join_game(self):
