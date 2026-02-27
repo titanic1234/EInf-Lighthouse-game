@@ -166,6 +166,7 @@ class BattleState(BaseState):
 
         self.game_manager.shots_fired += 1
         cell.scan_marked = False
+        cell.scan_found_ship = False
 
         if not cell.has_ship():
             cell.napalm_marked = True
@@ -265,6 +266,7 @@ class BattleState(BaseState):
                 if not cell or cell.is_shot():
                     continue
                 cell.scan_marked = True
+                cell.scan_found_ship = cell.has_ship()
                 if cell.has_ship():
                     found_positions.append((r + 1, c + 1))
 

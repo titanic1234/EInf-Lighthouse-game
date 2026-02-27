@@ -21,6 +21,7 @@ class Cell:
         self.status = CELL_EMPTY
         self.ship = None  # Referenz zum Schiff, falls vorhanden
         self.scan_marked = False
+        self.scan_found_ship = False
         self.napalm_marked = False
 
     def has_ship(self):
@@ -55,6 +56,7 @@ class Cell:
             return False  # Bereits beschossen
 
         self.scan_marked = False
+        self.scan_found_ship = False
         self.napalm_marked = False
 
         if self.has_ship():
@@ -74,6 +76,7 @@ class Cell:
         self.status = CELL_EMPTY
         self.ship = None
         self.scan_marked = False
+        self.scan_found_ship = False
         self.napalm_marked = False
 
     def __repr__(self):

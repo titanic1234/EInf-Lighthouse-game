@@ -229,8 +229,9 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True):
 
     if cell.scan_marked and not cell.is_shot():
         center = (x + config.CELL_SIZE // 2, y + config.CELL_SIZE // 2)
-        pygame.draw.circle(screen, (130, 255, 255), center, 10, 2)
-        pygame.draw.circle(screen, (130, 255, 255), center, 3)
+        marker_color = (255, 90, 90) if cell.scan_found_ship else (130, 255, 255)
+        pygame.draw.circle(screen, marker_color, center, 10, 2)
+        pygame.draw.circle(screen, marker_color, center, 3)
 
     if cell.napalm_marked and not cell.is_shot():
         icon = _get_status_icon("napalm")
