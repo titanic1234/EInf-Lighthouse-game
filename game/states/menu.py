@@ -49,8 +49,8 @@ class MenuState(BaseState):
         total_main_width = main_button_width * 3 + column_gap * 2
         row_one_start = center_x - total_main_width // 2
 
-        multiplayer_text = "Multiplayer" if mconfig.CONNENCTION else "Multiplayer (Offline)"
-        multiplayer_action = self._start_multiplayer if mconfig.CONNENCTION else self._do_nothing
+        multiplayer_text = "Multiplayer" if mconfig.CONNECTION else "Multiplayer (Offline)"
+        multiplayer_action = self._start_multiplayer if mconfig.CONNECTION else self._do_nothing
 
         row_one_buttons = [
             (theme.text_start_btn, self._start_game),
@@ -140,10 +140,10 @@ class MenuState(BaseState):
             button.update(dt, mouse_x, mouse_y)
 
         multiplayer_button = self.buttons[1]
-        if mconfig.CONNENCTION and multiplayer_button.text == "Multiplayer (Offline)":
+        if mconfig.CONNECTION and multiplayer_button.text == "Multiplayer (Offline)":
             multiplayer_button.text = "Multiplayer"
             multiplayer_button.action = self._start_multiplayer
-        elif not mconfig.CONNENCTION and multiplayer_button.text == "Multiplayer":
+        elif not mconfig.CONNECTION and multiplayer_button.text == "Multiplayer":
             multiplayer_button.text = "Multiplayer (Offline)"
             multiplayer_button.action = self._do_nothing
 
