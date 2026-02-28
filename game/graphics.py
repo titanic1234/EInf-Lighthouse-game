@@ -22,25 +22,111 @@ _THEME_STATUS_ICON_MAP = {
 }
 
 _STATUS_ICON_CACHE = {}
+_UI_SPRITE_CACHE = {}
 
+_THEME_UI_SPRITE_MAP = {
+    "MODERN": {
+        "water": "ui_modern_water_cell.png",
+        "ship_fallback": "ui_modern_ship_cell.png",
+        "hit": "ui_modern_hit.png",
+        "miss": "ui_modern_miss.png",
+        "destroyed": "ui_modern_destroyed.png",
+        "scan": "ui_modern_scan.png",
+        "scan_found": "ui_modern_scan_found.png",
+        "title_art": "ui_modern_title_art.png",
+    },
+    "PIRATE": {
+        "water": "ui_pirate_water_cell.png",
+        "ship_fallback": "ui_pirate_ship_cell.png",
+        "hit": "ui_pirate_hit.png",
+        "miss": "ui_pirate_miss.png",
+        "destroyed": "ui_pirate_destroyed.png",
+        "scan": "ui_pirate_scan.png",
+        "scan_found": "ui_pirate_scan_found.png",
+        "title_art": "ui_pirate_title_art.png",
+    },
+}
+
+_GENERIC_UI_SPRITE_MAP = {
+    "water": "ui_generic_water_cell.png",
+    "ship_fallback": "ui_generic_ship_cell.png",
+    "hit": "ui_generic_hit.png",
+    "miss": "ui_generic_miss.png",
+    "destroyed": "ui_generic_destroyed.png",
+    "scan": "ui_generic_scan.png",
+    "scan_found": "ui_generic_scan_found.png",
+    "title_art": "ui_generic_title_art.png",
+}
+
+
+def _get_ui_sprite(sprite_name):
+    theme_name = theme_manager.current.name
+    theme_filename = _THEME_UI_SPRITE_MAP.get(theme_name, {}).get(sprite_name)
+    generic_filename = _GENERIC_UI_SPRITE_MAP.get(sprite_name)
+
+    for filename in (theme_filename, generic_filename):
+        if not filename:
+            continue
+
+        cache_key = ("ui", filename)
+        if cache_key not in _UI_SPRITE_CACHE:
+            sprite_path = os.path.join("images", filename)
+            if not os.path.exists(sprite_path):
+                continue
+            try:
+                _UI_SPRITE_CACHE[cache_key] = pygame.image.load(sprite_path).convert_alpha()
+            except pygame.error:
+                continue
+
+        sprite_surface = _UI_SPRITE_CACHE.get(cache_key)
+        if sprite_surface is not None:
+            return sprite_surface
+
+    return None
+
+
+def scale_sprite_to_cell(sprite_surface, cell_size, fill_ratio=1.0):
+    """Skaliert ein Sprite proportional auf die Zellgröße und erhält das Seitenverhältnis."""
+    if sprite_surface is None:
+        return None
+
+    if fill_ratio <= 0:
+        fill_ratio = 1.0
+
+    target = max(1, int(round(cell_size * fill_ratio)))
+    src_w, src_h = sprite_surface.get_size()
+    if src_w <= 0 or src_h <= 0:
+        return None
+
+    scale_factor = min(target / src_w, target / src_h)
+    scaled_w = max(1, int(round(src_w * scale_factor)))
+    scaled_h = max(1, int(round(src_h * scale_factor)))
+    return pygame.transform.smoothscale(sprite_surface, (scaled_w, scaled_h))
 
 def _get_status_icon(icon_name):
     theme_name = theme_manager.current.name
-    filename = _THEME_STATUS_ICON_MAP.get(theme_name, {}).get(icon_name)
-    if not filename:
-        return None
+    theme_filename = _THEME_STATUS_ICON_MAP.get(theme_name, {}).get(icon_name)
+    generic_filename = f"ui_generic_{icon_name}.png"
 
-    cache_key = (theme_name, icon_name)
-    if cache_key not in _STATUS_ICON_CACHE:
-        icon_path = os.path.join("images", filename)
-        if not os.path.exists(icon_path):
-            return None
-        try:
-            _STATUS_ICON_CACHE[cache_key] = pygame.image.load(icon_path).convert_alpha()
-        except pygame.error:
-            return None
+    for filename in (theme_filename, generic_filename):
+        if not filename:
+            continue
 
-    return _STATUS_ICON_CACHE[cache_key]
+        cache_key = ("status", filename)
+        if cache_key not in _STATUS_ICON_CACHE:
+            icon_path = os.path.join("images", filename)
+            if not os.path.exists(icon_path):
+                continue
+            try:
+                _STATUS_ICON_CACHE[cache_key] = pygame.image.load(icon_path).convert_alpha()
+            except pygame.error:
+                continue
+
+        icon_surface = _STATUS_ICON_CACHE.get(cache_key)
+        if icon_surface is not None:
+            return icon_surface
+
+    return None
 
 _THEME_SHIP_IMAGE_MAP = {
     "MODERN": {
@@ -189,12 +275,14 @@ def _get_transformed_ship_surface(ship, grid_width, grid_height, orientation, sh
 
 
 def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True):
-    """Zeichnet eine Zelle als sauberes Geometrie-Objekt, ohne fehlerhafte Bilder."""
+    """Zeichnet eine Zelle als sprite"""
     theme = theme_manager.current
     cell_rect = pygame.Rect(x, y, config.CELL_SIZE, config.CELL_SIZE)
 
-    # Base Water Cell
-    draw_rounded_rect(screen, theme.color_water, cell_rect, radius=4, alpha=150)
+    water_sprite = _get_ui_sprite("water")
+    if water_sprite:
+        water_scaled = pygame.transform.smoothscale(water_sprite, (config.CELL_SIZE, config.CELL_SIZE))
+        screen.blit(water_scaled, cell_rect)
 
     # Zeige enemy ship png nur bei schon zerstörten Schiffen
     should_show_ship = (
@@ -203,45 +291,42 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True):
     )
 
     # Schiff
-    ship_image_drawn = False
     if should_show_ship:
         ship_image_drawn = _draw_ship_cell_image(screen, x, y, cell)
-        if not ship_image_drawn:  # Wenn kein img gefunden wurde einfach Kästchen
-            draw_rounded_rect(screen, theme.color_ship, cell_rect, radius=4, alpha=230)
-            inner = pygame.Rect(x + 4, y + 4, config.CELL_SIZE - 8, config.CELL_SIZE - 8)
-            draw_rounded_rect(screen, theme.color_ship_border, inner, radius=2, alpha=100)
+        if not ship_image_drawn:
+            ship_fallback = _get_ui_sprite("ship_fallback")
+            if ship_fallback:
+                ship_scaled = pygame.transform.smoothscale(ship_fallback, (config.CELL_SIZE, config.CELL_SIZE))
+                screen.blit(ship_scaled, cell_rect)
 
-    # Status (Treffer/Fehlschuss) zeichnen
-    if cell.status == 2:  # CELL_HIT
-        draw_rounded_rect(screen, theme.color_hit, cell_rect, radius=4, alpha=120 if ship_image_drawn else 180)
-        pygame.draw.line(screen, config.COLOR_WHITE, (x + 8, y + 8),
-                         (x + config.CELL_SIZE - 8, y + config.CELL_SIZE - 8), 3)
-        pygame.draw.line(screen, config.COLOR_WHITE, (x + config.CELL_SIZE - 8, y + 8),
-                         (x + 8, y + config.CELL_SIZE - 8), 3)
-    elif cell.status == 3:  # CELL_MISS
-        pygame.draw.circle(screen, theme.color_miss, (x + config.CELL_SIZE // 2, y + config.CELL_SIZE // 2), 6)
-    elif cell.status == 4:  # CELL_DESTROYED
-        draw_rounded_rect(screen, theme.color_destroyed, cell_rect, radius=4, alpha=110 if ship_image_drawn else 220)
-        pygame.draw.line(screen, (255, 220, 120), (x + 6, y + 6), (x + config.CELL_SIZE - 6, y + config.CELL_SIZE - 6),
-                         5)
-        pygame.draw.line(screen, (255, 220, 120), (x + config.CELL_SIZE - 6, y + 6), (x + 6, y + config.CELL_SIZE - 6),
-                         5)
+        if cell.status == config.CELL_HIT:
+            hit_sprite = _get_ui_sprite("hit")
+            if hit_sprite:
+                hit_scaled = scale_sprite_to_cell(hit_sprite, config.CELL_SIZE, fill_ratio=0.9)
+                screen.blit(hit_scaled, hit_scaled.get_rect(center=cell_rect.center))
+        elif cell.status == config.CELL_MISS:
+            miss_sprite = _get_ui_sprite("miss")
+            if miss_sprite:
+                miss_scaled = scale_sprite_to_cell(miss_sprite, config.CELL_SIZE, fill_ratio=0.55)
+                screen.blit(miss_scaled, miss_scaled.get_rect(center=cell_rect.center))
+        elif cell.status == config.CELL_DESTROYED:
+            destroyed_sprite = _get_ui_sprite("destroyed")
+            if destroyed_sprite:
+                destroyed_scaled = scale_sprite_to_cell(destroyed_sprite, config.CELL_SIZE, fill_ratio=0.95)
+                screen.blit(destroyed_scaled, destroyed_scaled.get_rect(center=cell_rect.center))
 
     if cell.scan_marked and not cell.is_shot():
-        center = (x + config.CELL_SIZE // 2, y + config.CELL_SIZE // 2)
-        marker_color = (255, 90, 90) if cell.scan_found_ship else (130, 255, 255)
-        pygame.draw.circle(screen, marker_color, center, 10, 2)
-        pygame.draw.circle(screen, marker_color, center, 3)
+        scan_name = "scan_found" if cell.scan_found_ship else "scan"
+        scan_sprite = _get_ui_sprite(scan_name)
+        if scan_sprite:
+            scan_scaled = scale_sprite_to_cell(scan_sprite, config.CELL_SIZE, fill_ratio=0.65)
+            screen.blit(scan_scaled, scan_scaled.get_rect(center=cell_rect.center))
 
     if cell.napalm_marked and not cell.is_shot():
         icon = _get_status_icon("napalm")
         if icon:
-            size = config.CELL_SIZE - 14
-            icon_surf = pygame.transform.smoothscale(icon, (size, size))
-            icon_rect = icon_surf.get_rect(center=cell_rect.center)
-            screen.blit(icon_surf, icon_rect)
-        else:
-            pygame.draw.circle(screen, (255, 180, 40), cell_rect.center, 12, 2)
+            icon_surf = scale_sprite_to_cell(icon, config.CELL_SIZE, fill_ratio=0.78)
+            screen.blit(icon_surf, icon_surf.get_rect(center=cell_rect.center))
 
     # Grid-Linien (Subtle)
     grid_color = theme.color_grid_player if not is_enemy else theme.color_grid_enemy
@@ -249,75 +334,18 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True):
 
 
 def draw_title_art(screen):
-    """Zeichnet ein Artwork für das Titelmenü passend zum Theme."""
+    """Zeichnet Artwork Sprite für menü"""
     center_x = config.WINDOW_WIDTH // 2
-    theme = theme_manager.current
+    title_sprite = _get_ui_sprite("title_art")
+    if not title_sprite:
+        return
 
-    if theme.name == "MODERN":
-        # Glowing wireframe ship
-        points = [
-            (center_x - 250, 360 + 150),  # Back bottom
-            (center_x + 150, 360 + 150),  # Front bottom
-            (center_x + 250, 290 + 150),  # Bow tip
-            (center_x + 80, 290 + 150),  # Front deck
-            (center_x + 30, 230 + 150),  # Bridge top right
-            (center_x - 70, 230 + 150),  # Bridge top left
-            (center_x - 120, 290 + 150),  # Back deck
-            (center_x - 250, 290 + 150),  # Back top
-        ]
-        pygame.draw.polygon(screen, (10, 25, 45), points)
-        pygame.draw.polygon(screen, (50, 150, 255), points, 3)
-        pygame.draw.circle(screen, (255, 50, 50), (int(center_x - 20), 220 + 150), 8)  # Radar glowing
-        pygame.draw.line(screen, (100, 200, 255), (center_x + 80, 275 + 150), (center_x + 180, 260 + 150),
-                         4)  # Cannon 1
-        pygame.draw.line(screen, (100, 200, 255), (center_x - 120, 275 + 150), (center_x - 220, 275 + 150),
-                         4)  # Cannon 2
-
-    elif theme.name == "PIRATE":
-        # Wooden Pirate Galleon
-        hull = [
-            (center_x - 200, 350 + 170),  # Back bottom
-            (center_x + 150, 350 + 170),  # Front bottom
-            (center_x + 250, 260 + 170),  # Bow tip
-            (center_x - 220, 260 + 170),  # Back top
-        ]
-        pygame.draw.polygon(screen, (139, 69, 19), hull)  # SaddleBrown
-        pygame.draw.polygon(screen, (101, 67, 33), hull, 4)  # Dark Brown outline
-
-        # Masts
-        pygame.draw.line(screen, (101, 67, 33), (center_x - 100, 260 + 170), (center_x - 100, 100 + 170), 8)
-        pygame.draw.line(screen, (101, 67, 33), (center_x + 50, 260 + 170), (center_x + 50, 120 + 170), 8)
-        pygame.draw.line(screen, (101, 67, 33), (center_x + 250, 260 + 170), (center_x + 320, 190 + 170), 6)  # Bowsprit
-
-        # Sails
-        sail1 = [(center_x - 100, 120 + 170), (center_x - 180, 240 + 170), (center_x - 20, 240 + 170)]
-        sail2 = [(center_x + 50, 140 + 170), (center_x - 30, 250 + 170), (center_x + 130, 250 + 170)]
-        pygame.draw.polygon(screen, (240, 230, 200), sail1)
-        pygame.draw.polygon(screen, (240, 230, 200), sail2)
-        pygame.draw.polygon(screen, (200, 190, 160), sail1, 2)
-        pygame.draw.polygon(screen, (200, 190, 160), sail2, 2)
-
-        # Cannons out the side
-        for cx in [center_x - 150, center_x - 50, center_x + 50]:
-            pygame.draw.circle(screen, (30, 30, 30), (cx, 300 + 170), 12)  # Port hole
-            pygame.draw.circle(screen, (10, 10, 10), (cx, 300 + 170), 8)  # Inner
-
-    # Water reflection
-    for i in range(4):
-        w = 500 - i * 120
-        y = 390 + 150 + i * 15
-        alpha = max(50, 200 - i * 50)
-        surf = pygame.Surface((w, 4), pygame.SRCALPHA)
-        # Use theme water color for reflection
-        r, g, b = theme.color_water
-
-        # Make reflection slightly brighter
-        r = min(255, r + 50)
-        g = min(255, g + 50)
-        b = min(255, b + 50)
-
-        surf.fill((r, g, b, alpha))
-        screen.blit(surf, (center_x - w // 2, y))
+    target_w = min(700, int(config.WINDOW_WIDTH * 0.45))
+    scale_factor = target_w / max(1, title_sprite.get_width())
+    target_h = max(1, int(title_sprite.get_height() * scale_factor))
+    scaled = pygame.transform.smoothscale(title_sprite, (target_w, target_h))
+    rect = scaled.get_rect(center=(center_x, 560))
+    screen.blit(scaled, rect)
 
 
 def draw_text(surface, text, x, y, font_size, color, center=False):
