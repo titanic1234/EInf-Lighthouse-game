@@ -3,7 +3,7 @@ Multiplayer Config
 """
 
 MULTIPLAYER_SERVER_URL = "http://127.0.0.1:8000/"
-CONNENCTION = False
+CONNECTION = False
 CHECK_CONNECTION_INTERVAL = 5
 CHECK_CONNECTION = True
 CHECK_CONNECTION_ACTIVE = False
@@ -32,8 +32,8 @@ def change_vars(code: str | None = CODE, name: str | None = NAME, player_token: 
 
 
 def connection_status(status: bool):
-    global CONNENCTION
-    CONNENCTION = status
+    global CONNECTION
+    CONNECTION = status
 
 
 def check_connection(status: bool = CHECK_CONNECTION, check: bool = CHECK_CONNECTION_ACTIVE, interval: int = CHECK_CONNECTION_INTERVAL):

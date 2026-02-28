@@ -63,6 +63,7 @@ class CreateGame(BaseState):
 
         # Buttons unter die Felder setzen
         self.buttons = []
+        self.text_fields = []
         self._create_buttons()
 
     def _create_buttons(self):
@@ -140,6 +141,13 @@ class CreateGame(BaseState):
         mx, my = mouse_pos
         for button in self.buttons:
             button.update(dt, mx, my)
+
+        if self.room_text is None and mconfig.CODE is not None:
+            self.room_text = str(mconfig.CODE)
+            self.text_fields[1].text = self.room_text
+
+
+
 
     def on_mouse_down(self, pos, button):
         if button != 1:
@@ -285,6 +293,7 @@ class CreateGame(BaseState):
         screen.blit(room_lbl, room_lbl.get_rect(center=(config.WINDOW_WIDTH // 2, self.room_rect.y - 22)))
 
         # Textfelder
+        self.text_fields = [
         self._draw_textbox(
             screen,
             self.name_rect,
@@ -292,7 +301,7 @@ class CreateGame(BaseState):
             self.name_placeholder,
             self.focus == "name",
             locked=False,
-        )
+        ),
         self._draw_textbox(
             screen,
             self.room_rect,
@@ -301,6 +310,7 @@ class CreateGame(BaseState):
             self.focus == "room",
             locked=self.room_locked,
         )
+        ]
 
         # Buttons
         for button in self.buttons:

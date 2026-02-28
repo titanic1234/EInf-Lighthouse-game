@@ -61,7 +61,7 @@ class MenuState(BaseState):
                 self._toggle_theme,
             )
         )
-        if mconfig.CONNENCTION:
+        if mconfig.CONNECTION:
             self.buttons.append(
                 GlowButton(
                     center_x,
@@ -154,11 +154,11 @@ class MenuState(BaseState):
             button.update(dt, mouse_x, mouse_y)
 
 
-        if mconfig.CONNENCTION and self.buttons[2].text == "Multiplayer (Offline)":
+        if mconfig.CONNECTION and self.buttons[2].text == "Multiplayer (Offline)":
             self.buttons[2].text = "Multiplayer"
             self.buttons[2].action = self._start_multiplayer
 
-        elif not mconfig.CONNENCTION and self.buttons[2].text == "Multiplayer":
+        elif not mconfig.CONNECTION and self.buttons[2].text == "Multiplayer":
             self.buttons[2].text = "Multiplayer (Offline)"
             self.buttons[2].action = self._do_nothing
 
