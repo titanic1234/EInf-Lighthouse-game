@@ -304,21 +304,21 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True):
             screen.blit(icon_surf, icon_surf.get_rect(center=cell_rect.center))
 
         # Hit/Miss
-        if cell.status == config.CELL_HIT:
-            hit_sprite = _get_ui_sprite("hit")
-            if hit_sprite:
-                hit_scaled = scale_sprite_to_cell(hit_sprite, config.CELL_SIZE, fill_ratio=0.9)
-                screen.blit(hit_scaled, hit_scaled.get_rect(center=cell_rect.center))
-        elif cell.status == config.CELL_MISS:
-            miss_sprite = _get_ui_sprite("miss")
-            if miss_sprite:
-                miss_scaled = scale_sprite_to_cell(miss_sprite, config.CELL_SIZE, fill_ratio=0.55)
-                screen.blit(miss_scaled, miss_scaled.get_rect(center=cell_rect.center))
-        elif cell.status == config.CELL_DESTROYED:
-            destroyed_sprite = _get_ui_sprite("destroyed")
-            if destroyed_sprite:
-                destroyed_scaled = scale_sprite_to_cell(destroyed_sprite, config.CELL_SIZE, fill_ratio=0.95)
-                screen.blit(destroyed_scaled, destroyed_scaled.get_rect(center=cell_rect.center))
+    if cell.status == config.CELL_HIT:
+        hit_sprite = _get_ui_sprite("hit")
+        if hit_sprite:
+            hit_scaled = scale_sprite_to_cell(hit_sprite, config.CELL_SIZE, fill_ratio=0.9)
+            screen.blit(hit_scaled, hit_scaled.get_rect(center=cell_rect.center))
+    elif cell.status == config.CELL_MISS:
+        miss_sprite = _get_ui_sprite("miss")
+        if miss_sprite:
+            miss_scaled = scale_sprite_to_cell(miss_sprite, config.CELL_SIZE, fill_ratio=0.55)
+            screen.blit(miss_scaled, miss_scaled.get_rect(center=cell_rect.center))
+    elif cell.status == config.CELL_DESTROYED:
+        destroyed_sprite = _get_ui_sprite("destroyed")
+        if destroyed_sprite:
+            destroyed_scaled = scale_sprite_to_cell(destroyed_sprite, config.CELL_SIZE, fill_ratio=0.95)
+            screen.blit(destroyed_scaled, destroyed_scaled.get_rect(center=cell_rect.center))
 
 
 def draw_title_art(screen):
