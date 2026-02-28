@@ -31,10 +31,12 @@ class MenuState(BaseState):
         start_y = config.MENU_BUTTON_Y
         theme = theme_manager.current
         self.toggle_text = ""
+        self.difficulty_text = ""
         if theme.name == "MODERN":
             self.toggle_text = "PIRATEN MODUS"
         else:
             self.toggle_text = "CLASSIC MODUS"
+        self._refresh_difficulty_text()
 
         # "Neues Spiel" Button
         self.buttons.append(
@@ -82,11 +84,22 @@ class MenuState(BaseState):
                 )
             )
 
-        # "Beenden" Button
         self.buttons.append(
             GlowButton(
                 center_x,
                 start_y + config.MENU_BUTTON_SPACING * 3,
+                config.MENU_BUTTON_WIDTH,
+                config.MENU_BUTTON_HEIGHT,
+                self.difficulty_text,
+                self._cycle_difficulty,
+            )
+        )
+
+        # "Beenden" Button
+        self.buttons.append(
+            GlowButton(
+                center_x,
+                start_y + config.MENU_BUTTON_SPACING * 4,
                 config.MENU_BUTTON_WIDTH,
                 config.MENU_BUTTON_HEIGHT,
                 theme.text_quit_btn,
@@ -105,6 +118,23 @@ class MenuState(BaseState):
     def _start_game(self):
         """Startet ein neues Spiel"""
         self.game_manager.change_state(config.STATE_PLACEMENT)
+
+    def _refresh_difficulty_text(self):
+        difficulty_names = {
+            "easy": "EINFACH",
+            "normal": "NORMAL",
+            "hard": "SCHWER",
+        }
+        current = self.game_manager.ai_difficulty
+        self.difficulty_text = f"KI SCHWIERIGKEIT: {difficulty_names.get(current, 'NORMAL')}"
+
+    def _cycle_difficulty(self):
+        levels = ["easy", "normal", "hard"]
+        current = self.game_manager.ai_difficulty
+        idx = levels.index(current) if current in levels else 1
+        self.game_manager.ai_difficulty = levels[(idx + 1) % len(levels)]
+        self._refresh_difficulty_text()
+        self.buttons[3].text = self.difficulty_text
 
     def _start_multiplayer(self):
         """Gehe ins Multiplayer-Menu"""

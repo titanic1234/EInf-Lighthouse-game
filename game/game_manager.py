@@ -42,6 +42,7 @@ class GameManager:
         self.shots_fired = 0
         self.shots_hit = 0
         self.time_elapsed = 0.0
+        self.ai_difficulty = "normal"
 
         # Initialer State
         self.change_state(STATE_MENU)

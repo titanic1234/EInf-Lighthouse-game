@@ -9,7 +9,7 @@ import pygame
 from pygame import Rect
 import game.config as config
 from game.entities.board import Board
-from game.ai.computer_ai import ComputerAI
+from game.ai import create_ai
 from game.graphics import draw_gradient_background, draw_rounded_rect, ParticleSystem, draw_text, draw_grid_cell
 from game.theme import theme_manager
 from game.states.base_state import BaseState
@@ -26,7 +26,7 @@ class BattleState(BaseState):
         self.computer_board = Board(config.COMPUTER_GRID_X, config.GRID_OFFSET_Y, "Computer")
         self.computer_board.place_ships_randomly()
 
-        self.ai = ComputerAI()
+        self.ai = create_ai(game_manager.ai_difficulty)
 
         self.player_turn = True
         self.game_over = False
@@ -371,29 +371,131 @@ class BattleState(BaseState):
 
     def _computer_turn(self):
         """Computer macht seinen Zug"""
-        row, col = self.ai.get_next_shot(self.player_board)
-        hit, destroyed, ship = self.player_board.shoot(row, col)
+        action = self.ai.choose_action(self.player_board)
+        action_type = action.get("type", "shoot")
 
-        self.ai.register_shot_result(row, col, hit, destroyed, ship)
-
-        self._spawn_effects(self.player_board, row, col, hit)
-
-        if hit:
-            if destroyed:
-                ship_name = theme_manager.get_ship_display_name(ship.name)
-                self.message = f"ALERT: ALLY {ship_name.upper()} SUNK!"
+        if action_type == "sonar":
+            row, col = action["row"], action["col"]
+            found = self._computer_sonar(row, col)
+            if found:
+                self.message = f"ENEMY SONAR DETECTED CONTACTS AT {len(found)} POSITIONS."
             else:
-                self.message = f"WARNING: HULL BREACH AT ({row + 1}, {col + 1})!"
+                self.message = "ENEMY SONAR: NO CONTACTS."
+                self.player_turn = True
+                self.message += " - YOUR TURN!"
+                return
+
+            if action_type == "airstrike":
+                hit = self._computer_airstrike(action["row"], action["col"])
+                self.message = "ENEMY AIRSTRIKE HIT!" if hit else "ENEMY AIRSTRIKE MISSED."
+                if not hit:
+                    self.player_turn = True
+                    self.message += " - YOUR TURN!"
+            elif action_type == "guided":
+                row, col, hit, destroyed, ship = self._computer_guided_missile()
+                self.message = self._computer_shot_message(row, col, hit, destroyed, ship, prefix="GUIDED")
+                if not hit:
+                    self.player_turn = True
+                    self.message += " - YOUR TURN!"
+            elif action_type == "napalm":
+                row, col = action["row"], action["col"]
+                hit, destroyed, ship = self._computer_napalm(row, col)
+                self.message = self._computer_shot_message(row, col, hit, destroyed, ship, prefix="NAPALM")
+                if not hit:
+                    self.player_turn = True
+                    self.message += " - YOUR TURN!"
         else:
-            self.message = f"ENEMY MISSED AT ({row + 1}, {col + 1})."
+            row, col = action["row"], action["col"]
+            hit, destroyed, ship = self.player_board.shoot(row, col)
+            self.ai.register_shot_result(row, col, hit, destroyed, ship)
+            self._spawn_effects(self.player_board, row, col, hit)
+            self.message = self._computer_shot_message(row, col, hit, destroyed, ship)
+            if not hit:
+                self.player_turn = True
+                self.message += " - YOUR TURN!"
 
         if self.player_board.all_ships_destroyed():
             self.game_over = True
             self.winner = "Computer"
             self._end_game()
-        elif not hit:
-                self.player_turn = True
-                self.message += " - YOUR TURN!"
+
+    def _computer_shot_message(self, row, col, hit, destroyed, ship, prefix=None):
+        marker = f"{prefix} " if prefix else ""
+        if hit:
+            if destroyed and ship:
+                ship_name = theme_manager.get_ship_display_name(ship.name)
+                return f"ALERT: {marker}ALLY {ship_name.upper()} SUNK!"
+            return f"WARNING: {marker}HULL BREACH AT ({row + 1}, {col + 1})!"
+        return f"ENEMY {marker}MISSED AT ({row + 1}, {col + 1})."
+
+    def _computer_sonar(self, center_row, center_col):
+        found_positions = []
+        for r in range(center_row - 1, center_row + 2):
+            for c in range(center_col - 1, center_col + 2):
+                cell = self.player_board.get_cell(r, c)
+                if not cell or cell.is_shot():
+                    continue
+                cell.scan_marked = True
+                cell.scan_found_ship = cell.has_ship()
+                if cell.has_ship():
+                    found_positions.append((r, c))
+
+        self.ai.register_sonar_findings(found_positions)
+        return found_positions
+
+    def _computer_airstrike(self, center_row, center_col):
+        hit_any = False
+        coords = [
+            (center_row, center_col),
+            (center_row - 1, center_col),
+            (center_row + 1, center_col),
+            (center_row, center_col - 1),
+            (center_row, center_col + 1),
+        ]
+        for row, col in coords:
+            cell = self.player_board.get_cell(row, col)
+            if not cell or cell.is_shot():
+                continue
+            hit, destroyed, ship = self.player_board.shoot(row, col)
+            self.ai.register_shot_result(row, col, hit, destroyed, ship)
+            self._spawn_effects(self.player_board, row, col, hit)
+            hit_any = hit_any or hit
+        return hit_any
+
+    def _computer_guided_missile(self):
+        candidates = []
+        for row in range(config.GRID_SIZE):
+            for col in range(config.GRID_SIZE):
+                cell = self.player_board.get_cell(row, col)
+                if cell and cell.has_ship() and not cell.is_shot() and not cell.napalm_marked:
+                    candidates.append((row, col))
+
+        if candidates:
+            row, col = random.choice(candidates)
+        else:
+            row, col = self.ai.get_next_shot(self.player_board)
+
+        hit, destroyed, ship = self.player_board.shoot(row, col)
+        self.ai.register_shot_result(row, col, hit, destroyed, ship)
+        self._spawn_effects(self.player_board, row, col, hit)
+        return row, col, hit, destroyed, ship
+
+    def _computer_napalm(self, row, col):
+        cell = self.player_board.get_cell(row, col)
+        if not cell or cell.is_shot():
+            row, col = self.ai.get_next_shot(self.player_board)
+            cell = self.player_board.get_cell(row, col)
+
+        if not cell.has_ship():
+            cell.napalm_marked = True
+            self.ai.tried_positions.add((row, col))
+            self._spawn_effects(self.player_board, row, col, False)
+            return False, False, None
+
+        hit, destroyed, ship = self.player_board.shoot(row, col)
+        self.ai.register_shot_result(row, col, hit, destroyed, ship)
+        self._spawn_effects(self.player_board, row, col, hit)
+        return hit, destroyed, ship
 
     def _end_game(self):
         """Beendet das Spiel"""
