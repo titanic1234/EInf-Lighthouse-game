@@ -32,82 +32,67 @@ class MenuState(BaseState):
         theme = theme_manager.current
         self.toggle_text = ""
         self.difficulty_text = ""
+
         if theme.name == "MODERN":
             self.toggle_text = "PIRATEN MODUS"
         else:
             self.toggle_text = "CLASSIC MODUS"
         self._refresh_difficulty_text()
 
-        # "Neues Spiel" Button
-        self.buttons.append(
-            GlowButton(
-                center_x,
-                start_y,
-                config.MENU_BUTTON_WIDTH,
-                config.MENU_BUTTON_HEIGHT,
-                theme.text_start_btn,
-                self._start_game,
-            )
-        )
+        main_button_width = 360
+        secondary_button_width = 540
+        column_gap = 30
+        row_gap = 30
+        row_one_y = start_y
+        row_two_y = start_y + config.MENU_BUTTON_HEIGHT + row_gap
 
-        # "Theme" Button
-        self.buttons.append(
-            GlowButton(
-                center_x,
-                start_y + config.MENU_BUTTON_SPACING * 1,
-                config.MENU_BUTTON_WIDTH,
-                config.MENU_BUTTON_HEIGHT,
-                self.toggle_text, #Button Text
-                self._toggle_theme,
-            )
-        )
-        if mconfig.CONNENCTION:
-            self.buttons.append(
-                GlowButton(
-                    center_x,
-                    start_y + config.MENU_BUTTON_SPACING * 2,
-                    config.MENU_BUTTON_WIDTH,
-                    config.MENU_BUTTON_HEIGHT,
-                    "Multiplayer",
-                    self._start_multiplayer,
-                )
-            )
-        else:
-            self.buttons.append(
-                GlowButton(
-                    center_x,
-                    start_y + config.MENU_BUTTON_SPACING * 2,
-                    config.MENU_BUTTON_WIDTH,
-                    config.MENU_BUTTON_HEIGHT,
-                    "Multiplayer (Offline)",
-                    self._do_nothing,
-                )
-            )
+        total_main_width = main_button_width * 3 + column_gap * 2
+        row_one_start = center_x - total_main_width // 2
 
-        self.buttons.append(
-            GlowButton(
-                center_x,
-                start_y + config.MENU_BUTTON_SPACING * 3,
-                config.MENU_BUTTON_WIDTH,
-                config.MENU_BUTTON_HEIGHT,
-                self.difficulty_text,
-                self._cycle_difficulty,
-            )
-        )
+        multiplayer_text = "Multiplayer" if mconfig.CONNENCTION else "Multiplayer (Offline)"
+        multiplayer_action = self._start_multiplayer if mconfig.CONNENCTION else self._do_nothing
 
-        # "Beenden" Button
-        self.buttons.append(
-            GlowButton(
-                center_x,
-                start_y + config.MENU_BUTTON_SPACING * 4,
-                config.MENU_BUTTON_WIDTH,
-                config.MENU_BUTTON_HEIGHT,
-                theme.text_quit_btn,
-                self._quit_game,
-            )
-        )
+        row_one_buttons = [
+            (theme.text_start_btn, self._start_game),
+            (multiplayer_text, multiplayer_action),
+            (theme.text_quit_btn, self._quit_game),
+        ]
 
-        print(self.buttons)
+        self.buttons = []
+        self.button_map = {}
+
+        for idx, (label, action) in enumerate(row_one_buttons):
+            x = row_one_start + idx * (main_button_width + column_gap) + main_button_width // 2
+            btn = GlowButton(
+                x,
+                row_one_y,
+                main_button_width,
+                config.MENU_BUTTON_HEIGHT,
+                label,
+                action,
+            )
+            self.buttons.append(btn)
+
+        total_secondary_width = secondary_button_width * 2 + column_gap
+        row_two_start = center_x - total_secondary_width // 2
+
+        secondary_buttons = [
+            ("theme", self.toggle_text, self._toggle_theme),
+            ("difficulty", self.difficulty_text, self._cycle_difficulty),
+        ]
+
+        for idx, (key, label, action) in enumerate(secondary_buttons):
+            x = row_two_start + idx * (secondary_button_width + column_gap) + secondary_button_width // 2
+            btn = GlowButton(
+                x,
+                row_two_y,
+                secondary_button_width,
+                config.MENU_BUTTON_HEIGHT,
+                label,
+                action,
+            )
+            self.buttons.append(btn)
+            self.button_map[key] = btn
 
     def _toggle_theme(self):
         theme_manager.toggle()
@@ -134,7 +119,7 @@ class MenuState(BaseState):
         idx = levels.index(current) if current in levels else 1
         self.game_manager.ai_difficulty = levels[(idx + 1) % len(levels)]
         self._refresh_difficulty_text()
-        self.buttons[3].text = self.difficulty_text
+        self.button_map["difficulty"].text = self.difficulty_text
 
     def _start_multiplayer(self):
         """Gehe ins Multiplayer-Menu"""
@@ -154,14 +139,13 @@ class MenuState(BaseState):
         for button in self.buttons:
             button.update(dt, mouse_x, mouse_y)
 
-
-        if mconfig.CONNENCTION and self.buttons[2].text == "Multiplayer (Offline)":
-            self.buttons[2].text = "Multiplayer"
-            self.buttons[2].action = self._start_multiplayer
-
-        elif not mconfig.CONNENCTION and self.buttons[2].text == "Multiplayer":
-            self.buttons[2].text = "Multiplayer (Offline)"
-            self.buttons[2].action = self._do_nothing
+        multiplayer_button = self.buttons[1]
+        if mconfig.CONNENCTION and multiplayer_button.text == "Multiplayer (Offline)":
+            multiplayer_button.text = "Multiplayer"
+            multiplayer_button.action = self._start_multiplayer
+        elif not mconfig.CONNENCTION and multiplayer_button.text == "Multiplayer":
+            multiplayer_button.text = "Multiplayer (Offline)"
+            multiplayer_button.action = self._do_nothing
 
 
 

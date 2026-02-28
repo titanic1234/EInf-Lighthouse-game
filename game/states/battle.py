@@ -385,25 +385,25 @@ class BattleState(BaseState):
                 self.message += " - YOUR TURN!"
                 return
 
-            if action_type == "airstrike":
-                hit = self._computer_airstrike(action["row"], action["col"])
-                self.message = "ENEMY AIRSTRIKE HIT!" if hit else "ENEMY AIRSTRIKE MISSED."
-                if not hit:
-                    self.player_turn = True
-                    self.message += " - YOUR TURN!"
-            elif action_type == "guided":
-                row, col, hit, destroyed, ship = self._computer_guided_missile()
-                self.message = self._computer_shot_message(row, col, hit, destroyed, ship, prefix="GUIDED")
-                if not hit:
-                    self.player_turn = True
-                    self.message += " - YOUR TURN!"
-            elif action_type == "napalm":
-                row, col = action["row"], action["col"]
-                hit, destroyed, ship = self._computer_napalm(row, col)
-                self.message = self._computer_shot_message(row, col, hit, destroyed, ship, prefix="NAPALM")
-                if not hit:
-                    self.player_turn = True
-                    self.message += " - YOUR TURN!"
+        if action_type == "airstrike":
+            hit = self._computer_airstrike(action["row"], action["col"])
+            self.message = "ENEMY AIRSTRIKE HIT!" if hit else "ENEMY AIRSTRIKE MISSED."
+            if not hit:
+                self.player_turn = True
+                self.message += " - YOUR TURN!"
+        elif action_type == "guided":
+            row, col, hit, destroyed, ship = self._computer_guided_missile()
+            self.message = self._computer_shot_message(row, col, hit, destroyed, ship, prefix="GUIDED")
+            if not hit:
+                self.player_turn = True
+                self.message += " - YOUR TURN!"
+        elif action_type == "napalm":
+            row, col = action["row"], action["col"]
+            hit, destroyed, ship = self._computer_napalm(row, col)
+            self.message = self._computer_shot_message(row, col, hit, destroyed, ship, prefix="NAPALM")
+            if not hit:
+                self.player_turn = True
+                self.message += " - YOUR TURN!"
         else:
             row, col = action["row"], action["col"]
             hit, destroyed, ship = self.player_board.shoot(row, col)
@@ -430,6 +430,7 @@ class BattleState(BaseState):
 
     def _computer_sonar(self, center_row, center_col):
         found_positions = []
+        miss_positions = []
         for r in range(center_row - 1, center_row + 2):
             for c in range(center_col - 1, center_col + 2):
                 cell = self.player_board.get_cell(r, c)
@@ -439,8 +440,11 @@ class BattleState(BaseState):
                 cell.scan_found_ship = cell.has_ship()
                 if cell.has_ship():
                     found_positions.append((r, c))
+                else:
+                    miss_positions.append((r, c))
 
         self.ai.register_sonar_findings(found_positions)
+        self.ai.register_sonar_misses(miss_positions)
         return found_positions
 
     def _computer_airstrike(self, center_row, center_col):

@@ -14,6 +14,7 @@ class BaseComputerAI:
         self.tried_positions = set()
         self.unresolved_hits = set()
         self.known_ship_cells = set()  # noch nicht beschossene Sonar-Marks
+        self.sonar_miss_positions = set()
 
     def choose_action(self, board):
         """Wird von Unterklassen überschrieben. Rückgabe: dict(type=..., row=..., col=...)."""
@@ -22,8 +23,15 @@ class BaseComputerAI:
 
     def register_sonar_findings(self, found_positions):
         for pos in found_positions:
+            self.sonar_miss_poitions.discard(pos)
             if pos not in self.tried_positions:
                 self.known_ship_cells.add(pos)
+
+    def register_sonar_misses(self, miss_positions):
+        for pos in miss_positions:
+            if pos in self.tried_positions or pos in self.known_ship_cells:
+                continue
+            self.sonar_miss_positions.add(pos)
 
     def get_next_shot(self, board):
         if self.mode == self.MODE_TARGET and self.possible_targets:
@@ -44,6 +52,8 @@ class BaseComputerAI:
         for row in range(GRID_SIZE):
             for col in range(GRID_SIZE):
                 if (row, col) in self.tried_positions:
+                    continue
+                if (row, col) in self.sonar_miss_positions:
                     continue
                 cell = board.get_cell(row, col)
                 if cell and not cell.is_shot():
@@ -69,7 +79,7 @@ class BaseComputerAI:
             if shot in self.tried_positions:
                 continue
             cell = board.get_cell(*shot)
-            if cell and not cell.is_shot():
+            if cell and not cell.is_shot() and shot not in self.sonar_miss_positions:
                 self.tried_positions.add(shot)
                 return shot
 
@@ -79,6 +89,7 @@ class BaseComputerAI:
     def register_shot_result(self, row, col, hit, destroyed, ship):
         self.tried_positions.add((row, col))
         self.known_ship_cells.discard((row, col))
+        self.sonar_miss_positions.discard((row, col))
 
         if hit:
             self.unresolved_hits.add((row, col))
@@ -135,6 +146,7 @@ class BaseComputerAI:
             and 0 <= col < GRID_SIZE
             and (row, col) not in self.tried_positions
             and (row, col) not in self.possible_targets
+            and (row, col) not in self.sonar_miss_positions
         ):
             self.possible_targets.append((row, col))
 
@@ -150,6 +162,7 @@ class BaseComputerAI:
                     if 0 <= nr < GRID_SIZE and 0 <= nc < GRID_SIZE:
                         self.tried_positions.add((nr, nc))
                         self.known_ship_cells.discard((nr, nc))
+                        #self.sonar_miss_positions.discard((nr, nc))
 
     def reset(self):
         self.mode = self.MODE_HUNT
@@ -157,6 +170,7 @@ class BaseComputerAI:
         self.tried_positions = set()
         self.unresolved_hits = set()
         self.known_ship_cells = set()
+        self.sonar_miss_positions = set()
 
     def __repr__(self):
         return f"{self.__class__.__name__}(mode={self.mode}, targets={len(self.possible_targets)}, unresolved={len(self.unresolved_hits)})"

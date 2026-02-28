@@ -7,6 +7,12 @@ from game.ai.normal_ai import NormalComputerAI
 
 class HardComputerAI(NormalComputerAI):
     def choose_action(self, board):
+        # Guided missile zum finden neuer targets einsetzen
+        if self.abilities["guided"] > 0 and self._should_use_guided(board):
+            self.abilities["guided"] -= 1
+            row, col = self._random_untried(board)
+            return {"type": "guided", "row": row, "col": col}
+
         # Sonar früh einsetzen, um schnell Zielzellen zu markieren
         if self.abilities["sonar"] > 0:
             self.abilities["sonar"] -= 1
@@ -18,12 +24,6 @@ class HardComputerAI(NormalComputerAI):
             self.abilities["airstrike"] -= 1
             row, col = self._best_airstrike_center(board)
             return {"type": "airstrike", "row": row, "col": col}
-
-        # Guided nur unter den gewünschten Bedingungen
-        if self.abilities["guided"] > 0 and self._should_use_guided(board):
-            self.abilities["guided"] -= 1
-            row, col = self._random_untried(board)
-            return {"type": "guided", "row": row, "col": col}
 
         # Napalm optional in der Suche; danach nicht auf markierte Felder schießen
         if self.abilities["napalm"] > 0 and self.mode == self.MODE_HUNT and random.random() < 0.3:
@@ -38,19 +38,37 @@ class HardComputerAI(NormalComputerAI):
         """Nutze guided missile nur für 2x1 oder um neues ship zu finden"""
         remaining = [ship for ship in board.ships if not ship.is_destroyed()]
         two_cell_remaining = [ship for ship in remaining if ship.get_size() == 2]
-        partial_non_two = [ship for ship in remaining if ship.get_size() != 2 and ship.hits > 0]
+        all_except_two_destroyed = len(remaining) == 1 and len(two_cell_remaining) == 1
 
-        if len(remaining) == 1 and two_cell_remaining:
+        if all_except_two_destroyed:
             return True
 
-        two_cell_destroyed = any(ship.get_size() == 2 and ship.is_destroyed() for ship in board.ships)
-        if two_cell_destroyed and not partial_non_two:
+        two_cell_destroyed = any(
+            ship.get_size() == 2 and ship.get_height() == 1 and ship.is_destroyed() for ship in board.ships
+        )
+        if two_cell_destroyed and not self._has_open_targets(board):
             return True
 
         return False
 
+    def _has_open_targets(self, board):
+        if self.known_ship_cells:
+            return True
+
+        for hit_row, hit_col in self.unresolved_hits:
+            for dr, dc in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+                nr, nc = hit_row + dr, hit_col + dc
+                cell = board.get_cell(nr, nc)
+                if not cell or cell.is_shot():
+                    continue
+                if (nr, nc) in self.tried_positions or (nr, nc) in self.sonar_miss_positions:
+                    continue
+                return True
+
+        return False
+
     def _best_sonar_center(self, board):
-        best = None
+        best_cells = []
         best_score = -1
         for row in range(GRID_SIZE):
             for col in range(GRID_SIZE):
@@ -58,12 +76,16 @@ class HardComputerAI(NormalComputerAI):
                 for r in range(row - 1, row + 2):
                     for c in range(col - 1, col + 2):
                         cell = board.get_cell(r, c)
-                        if cell and not cell.is_shot() and (r, c) not in self.tried_positions:
+                        if cell and not cell.is_shot() and (r, c) not in self.tried_positions and (r, c) not in self.sonar_miss_positions:
                             score += 1
                 if score > best_score:
-                    best = (row, col)
+                    best_cells = [(row, col)]
                     best_score = score
-        return best if best else (random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1))
+                elif score == best_score:
+                    best_cells.append((row, col))
+        if best_cells:
+            return random.choice(best_cells)
+        return random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1)
 
     def _best_airstrike_center(self, board):
         best = None
