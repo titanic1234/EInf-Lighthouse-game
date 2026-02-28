@@ -6,7 +6,7 @@ Enthaelt alle Konstanten, Farben und Spielregeln
 # Fenster
 WINDOW_WIDTH = 1920
 WINDOW_HEIGHT = 1080
-TITLE = "Schiffe Versenken - Navy Command"
+TITLE = "Schiffe Versenken - Navy Commnda"
 WINDOW_RESIZABLE = True
 WINDOW_FULLSCREEN = False
 WINDOW_FULLSCREEN_CHANGED = False
@@ -74,10 +74,10 @@ ORIENTATION_HORIZONTAL = 0
 ORIENTATION_VERTICAL = 1
 
 # Text-Einstellungen
-FONT_SIZE_TITLE = 48
-FONT_SIZE_LARGE = 32
-FONT_SIZE_MEDIUM = 24
-FONT_SIZE_SMALL = 18
+FONT_SIZE_TITLE = 120
+FONT_SIZE_LARGE = 60
+FONT_SIZE_MEDIUM = 48
+FONT_SIZE_SMALL = 32
 
 # Menu UI
 MENU_BUTTON_WIDTH = 400
@@ -140,6 +140,17 @@ GAME_OVER_STATS_Y = 420
 GAME_OVER_STATS_FONT_SIZE = 36
 GAME_OVER_ICON_MARGIN_BOTTOM = 50
 GAME_OVER_ICON_FONT_SIZE = 32
+
+
+# Create / Join Game
+COLOR_TEXT_PRIMARY = COLOR_WHITE
+COLOR_TEXT_SECONDARY = (150, 165, 190)
+
+COLOR_INPUT_BG = (10, 16, 28)         # dunkles navy
+COLOR_INPUT_BORDER = (70, 90, 120)    # dezenter Rahmen
+COLOR_INPUT_FOCUS = (120, 180, 255)   # Fokus (hellblau)
+
+
 
 
 def update_layout(width=None, height=None):
