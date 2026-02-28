@@ -61,6 +61,7 @@ STATE_MULTIPLAYER_WAITING = "multiplayer_waiting"
 STATE_MULTIPLAYER_GAME = "multiplayer_game"
 STATE_MULTIPLAYER_CREATE = "multiplayer_create"
 STATE_MULTIPLAYER_JOIN = "multiplayer_join"
+STATE_MULTIPLAYER_PLACEMENT = "multiplayer_placement"
 
 # Zell-Status
 CELL_EMPTY = 0

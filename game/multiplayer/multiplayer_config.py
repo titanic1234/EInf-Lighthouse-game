@@ -3,6 +3,7 @@ Multiplayer Config
 """
 
 MULTIPLAYER_SERVER_URL = "http://127.0.0.1:8000/"
+MULTIPLAYER_WS_URL = "ws://127.0.0.1:8000/ws/"
 CONNECTION = False
 CHECK_CONNECTION_INTERVAL = 5
 CHECK_CONNECTION = True
@@ -18,6 +19,10 @@ NAME: str | None = None
 PLAYER_TOKEN: str | None = None
 ROLE: str | None = None
 
+OPPONENT_NAME: str | None = None
+READY: bool = False
+
+WINNER: str | None = None
 
 
 

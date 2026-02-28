@@ -9,29 +9,30 @@ from game.graphics import draw_gradient_background, GlowButton, draw_title_art
 from game.states.base_state import BaseState
 
 import game.multiplayer.multiplayer_config as mconfig
+from game.multiplayer.ws import WSClient
 
 from game.multiplayer.communication import create_game as create_game_request
 from game.multiplayer.schemas import CreateGame as CreateGameSchema
 
 
-class CreateGame(BaseState):
+class CreateGameState(BaseState):
     """Multiplayer: Create Game Screen (Name + RoomCode + Start/Back)"""
 
     def __init__(self, game_manager):
         super().__init__(game_manager)
 
+
+        self.ws = WSClient()
+
         # ---- Field State ----
-        self.name_text = ""
+        self.name_text = mconfig.NAME if mconfig.NAME else ""
         self.name_placeholder = "Spieler"
         self.name_max_len = 16
 
-        self.room_text = "Waiting..."
+        self.room_text = mconfig.CODE if mconfig.CODE else ""
         self.room_placeholder = "z.B. 123456"
         self.room_max_len = 6
         self.room_locked = True  # gesperrt: nicht editierbar/fokussierbar, aber kopierbar
-
-        if mconfig.CODE is not None:
-            self.room_text = str(mconfig.CODE)
 
         # Fokus: "name" | "room" | None
         self.focus = "name"
@@ -93,14 +94,10 @@ class CreateGame(BaseState):
         self.game_manager.change_state(config.STATE_MULTIPLAYER_MENU)
 
     def _start_game(self):
-        # Beispiel (wenn du starten willst):
-        # name = self.name_text.strip() or "Spieler"
-        # try:
-        #     payload = CreateGameSchema(name=name)
-        # except TypeError:
-        #     payload = CreateGameSchema(name=name)
-        # create_game_request(payload)
-        pass
+        mconfig.change_vars(name=self.name_text)
+        self.game_manager.change_state(config.STATE_MULTIPLAYER_PLACEMENT)
+        self.ws.start()
+
 
     # ---------- Copy / Toast ----------
     def _show_copy_toast(self, text: str, duration: float = 2.0):
@@ -201,9 +198,49 @@ class CreateGame(BaseState):
                 self.room_text = self.room_text[:-1]
             return
 
-        # optional: STRG+C kopiert auch (wenn room locked)
+        # STRG+C kopiert Room Code
         if key == pygame.K_c and (pygame.key.get_mods() & pygame.KMOD_CTRL):
             self._copy_room_code()
+            return
+
+        # ---------- HIER: normale Texteingabe über KEYDOWN ----------
+        if self.focus != "name":
+            return
+
+        # Nur Zeichen, wenn kein Ctrl/Alt gedrückt ist
+        mods = pygame.key.get_mods()
+        if mods & (pygame.KMOD_CTRL | pygame.KMOD_ALT | pygame.KMOD_META):
+            return
+
+        ch = None
+
+        # Buchstaben
+        if pygame.K_a <= key <= pygame.K_z:
+            ch = chr(key)
+            # Shift => Großbuchstaben
+            if mods & pygame.KMOD_SHIFT:
+                ch = ch.upper()
+
+        # Zahlen
+        elif pygame.K_0 <= key <= pygame.K_9:
+            ch = chr(key)
+
+        # Space
+        elif key == pygame.K_SPACE:
+            ch = " "
+
+        # ein paar sinnvolle Zeichen
+        elif key in (pygame.K_MINUS, pygame.K_PERIOD, pygame.K_COMMA, pygame.K_UNDERSCORE):
+            mapping = {
+                pygame.K_MINUS: "-",
+                pygame.K_PERIOD: ".",
+                pygame.K_COMMA: ",",
+                pygame.K_UNDERSCORE: "_",
+            }
+            ch = mapping.get(key)
+
+        if ch and len(self.name_text) < self.name_max_len:
+            self.name_text += ch
 
     def on_text_input(self, text: str):
         """Nutze pygame.TEXTINPUT, falls dein GameManager das weiterreicht."""
@@ -286,7 +323,7 @@ class CreateGame(BaseState):
 
         # Labels
         label_font = pygame.font.Font(None, config.FONT_SIZE_SMALL)
-        host_lbl = label_font.render("Host's Name:", True, config.COLOR_LIGHT_GRAY)
+        host_lbl = label_font.render("Your Name:", True, config.COLOR_LIGHT_GRAY)
         screen.blit(host_lbl, host_lbl.get_rect(center=(config.WINDOW_WIDTH // 2, self.name_rect.y - 22)))
 
         room_lbl = label_font.render("Room Code:", True, config.COLOR_LIGHT_GRAY)

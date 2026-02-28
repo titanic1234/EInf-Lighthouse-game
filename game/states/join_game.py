@@ -1,8 +1,6 @@
-# create_game.py
+# join_game.py
 
 import pygame
-import random
-import string
 
 import game.config as config
 from game.graphics import draw_gradient_background, GlowButton, draw_title_art
@@ -10,91 +8,79 @@ from game.states.base_state import BaseState
 
 import game.multiplayer.multiplayer_config as mconfig
 
-from game.multiplayer.communication import create_game as create_game_request
-from game.multiplayer.schemas import CreateGame as CreateGameSchema
 
-
-class JoinGame(BaseState):
-    """Multiplayer: Create Game Screen (Name + RoomCode + Start/Back)"""
+class JoinGameState(BaseState):
+    """Multiplayer: Join Game Screen (Name + RoomCode + Join/Back)"""
 
     def __init__(self, game_manager):
         super().__init__(game_manager)
 
         # ---- Field State ----
-        self.name_text = ""
+        self.name_text = mconfig.NAME if mconfig.NAME else ""
         self.name_placeholder = "Spieler"
         self.name_max_len = 16
 
-        self.room_text = "Waiting..."
+        self.room_text = mconfig.CODE if mconfig.CODE else ""
         self.room_placeholder = "z.B. 123456"
         self.room_max_len = 6
-        self.room_locked = True
-
-        if mconfig.CODE is not None:
-            self.room_text = mconfig.CODE
+        self.room_locked = False
 
         # Fokus: "name" | "room" | None
         self.focus = "name"
         self.cursor_t = 0.0
 
-        # ---- Layout (CREATE GAME über dem Schiff) ----
+        # ---- Layout (JOIN GAME über dem Schiff) ----
         center_x = config.WINDOW_WIDTH // 2
         self.field_w = config.MENU_BUTTON_WIDTH
         self.field_h = 70
 
-        # Orientierung an Subtitle/Artwork, stabil bei 1920x1080
-        # Titelblock endet ca. bei MENU_SUBTITLE_Y -> darunter sitzt das Schiff
         ship_center_y = config.MENU_SUBTITLE_Y + 220
-
-        # Heading sitzt ÜBER dem Schiff
         self.heading_y = ship_center_y - 120
 
-        # Felder unter dem Schiff
         fields_top = ship_center_y + 150
-
         self.name_rect = pygame.Rect(center_x - self.field_w // 2, fields_top, self.field_w, self.field_h)
         self.room_rect = pygame.Rect(center_x - self.field_w // 2, fields_top + 120, self.field_w, self.field_h)
 
-        # Buttons unter die Felder setzen
+        # Buttons
         self.buttons = []
         self._create_buttons()
-
 
     def _create_buttons(self):
         center_x = config.WINDOW_WIDTH // 2
         start_y = config.MENU_BUTTON_Y
 
-        self.buttons = [
-            GlowButton(
-                center_x,
-                start_y + config.MENU_BUTTON_SPACING * 2,
-                config.MENU_BUTTON_WIDTH,
-                config.MENU_BUTTON_HEIGHT,
-                "Start Game",
-                self._start_game,
-            ),
-            GlowButton(
-                center_x,
-                start_y + config.MENU_BUTTON_SPACING * 3,
-                config.MENU_BUTTON_WIDTH,
-                config.MENU_BUTTON_HEIGHT,
-                "Back",
-                self._back_menu,
-            ),
-        ]
+        self.btn_join = GlowButton(
+            center_x,
+            start_y + config.MENU_BUTTON_SPACING * 2,
+            config.MENU_BUTTON_WIDTH,
+            config.MENU_BUTTON_HEIGHT,
+            "Join Game",
+            self._start_game,
+        )
+        self.btn_back = GlowButton(
+            center_x,
+            start_y + config.MENU_BUTTON_SPACING * 3,
+            config.MENU_BUTTON_WIDTH,
+            config.MENU_BUTTON_HEIGHT,
+            "Back",
+            self._back_menu,
+        )
+
+        self.buttons = [self.btn_join, self.btn_back]
 
     def _back_menu(self):
         self.game_manager.change_state(config.STATE_MULTIPLAYER_MENU)
 
     def _start_game(self):
-        pass
-
-        # optional:
-        # self.game_manager.change_state(config.STATE_MULTIPLAYER_WAITING)
+        mconfig.change_vars(name=self.name_text, code=self.room_text)
 
     # ---------------- Update / Input ----------------
     def update(self, dt, mouse_pos):
         self.cursor_t += dt
+
+        # Join nur aktiv, wenn Code 6-stellig ist
+        code_ok = (len(self.room_text) == self.room_max_len)
+        self.btn_join.enabled = code_ok  # GlowButton muss enabled unterstützen; falls nicht, siehe Hinweis unten.
 
         mx, my = mouse_pos
         for button in self.buttons:
@@ -104,7 +90,6 @@ class JoinGame(BaseState):
         if button != 1:
             return
 
-        # Fokus auf Textfelder
         if self.name_rect.collidepoint(pos):
             self.focus = "name"
             self.cursor_t = 0.0
@@ -116,13 +101,14 @@ class JoinGame(BaseState):
                 self.cursor_t = 0.0
             return
 
-        # Buttons
         for btn in self.buttons:
             if btn.hovered:
+                # falls disabled: nicht klicken
+                if hasattr(btn, "enabled") and not btn.enabled:
+                    return
                 btn.click()
                 return
 
-        # Klick außerhalb -> Fokus weg
         self.focus = None
 
     def on_key_down(self, key):
@@ -131,7 +117,8 @@ class JoinGame(BaseState):
             return
 
         if key in (pygame.K_RETURN, pygame.K_KP_ENTER):
-            self._start_game()
+            if len(self.room_text) == self.room_max_len:
+                self._start_game()
             return
 
         if key == pygame.K_TAB:
@@ -145,12 +132,59 @@ class JoinGame(BaseState):
         if key == pygame.K_BACKSPACE:
             if self.focus == "name" and self.name_text:
                 self.name_text = self.name_text[:-1]
-            elif self.focus == "room" and self.room_text:
+            elif self.focus == "room" and (not self.room_locked) and self.room_text:
                 self.room_text = self.room_text[:-1]
             return
 
+        # -------- Texteingabe über KEYDOWN (funktioniert immer) --------
+        mods = pygame.key.get_mods()
+        if mods & (pygame.KMOD_CTRL | pygame.KMOD_ALT | pygame.KMOD_META):
+            return
+
+        # Name: Buchstaben/Zahlen/Space usw.
+        if self.focus == "name":
+            ch = None
+
+            if pygame.K_a <= key <= pygame.K_z:
+                ch = chr(key)
+                if mods & pygame.KMOD_SHIFT:
+                    ch = ch.upper()
+
+            elif pygame.K_0 <= key <= pygame.K_9:
+                ch = chr(key)
+
+            elif key == pygame.K_SPACE:
+                ch = " "
+
+            elif key in (pygame.K_MINUS, pygame.K_PERIOD, pygame.K_COMMA, pygame.K_UNDERSCORE):
+                mapping = {
+                    pygame.K_MINUS: "-",
+                    pygame.K_PERIOD: ".",
+                    pygame.K_COMMA: ",",
+                    pygame.K_UNDERSCORE: "_",
+                }
+                ch = mapping.get(key)
+
+            if ch and len(self.name_text) < self.name_max_len:
+                self.name_text += ch
+
+        # Room Code
+        elif self.focus == "room" and not self.room_locked:
+            if len(self.room_text) >= self.room_max_len:
+                return
+
+            # A-Z
+            if pygame.K_a <= key <= pygame.K_z:
+                self.room_text += chr(key).upper()
+                return
+
+            # 0-9
+            if pygame.K_0 <= key <= pygame.K_9:
+                self.room_text += chr(key)
+                return
+
     def on_text_input(self, text: str):
-        """Nutze pygame.TEXTINPUT, falls dein GameManager das weiterreicht."""
+        """Optional: falls dein GameManager pygame.TEXTINPUT weiterreicht (z.B. für Umlaute)."""
         if not text:
             return
         ch = text[0]
@@ -162,13 +196,12 @@ class JoinGame(BaseState):
         if self.focus == "name":
             if len(self.name_text) < self.name_max_len:
                 self.name_text += ch
-        elif self.focus == "room":
+        elif self.focus == "room" and not self.room_locked:
             if ch.isdigit() and len(self.room_text) < self.room_max_len:
                 self.room_text += ch
 
     # ---------------- Drawing ----------------
     def _draw_textbox(self, screen, rect, value, placeholder, focused):
-        # Farben aus config (optional erweiterbar)
         bg = getattr(config, "COLOR_INPUT_BG", (15, 25, 45))
         border = getattr(config, "COLOR_INPUT_BORDER", (70, 110, 170))
         border_focus = getattr(config, "COLOR_INPUT_FOCUS", (120, 180, 255))
@@ -179,13 +212,13 @@ class JoinGame(BaseState):
         pygame.draw.rect(screen, bg, rect, border_radius=14)
         pygame.draw.rect(screen, border_focus if focused else border, rect, width=3, border_radius=14)
 
-        font = pygame.font.Font(None, config.FONT_SIZE_SMALL)
+        font = pygame.font.Font(None, getattr(config, "INPUT_FONT_SIZE", config.FONT_SIZE_SMALL))
+
         shown = value if value else placeholder
         col = text_col if value else hint_col
         surf = font.render(shown, True, col)
         screen.blit(surf, (rect.x + 16, rect.centery - surf.get_height() // 2))
 
-        # Cursor blink
         if focused and (int(self.cursor_t * 2) % 2 == 0):
             cx = rect.x + 16 + min(rect.w - 32, 12 * len(value))
             pygame.draw.line(screen, text_col, (cx, rect.y + 10), (cx, rect.bottom - 10), 2)
@@ -211,15 +244,15 @@ class JoinGame(BaseState):
         sub_rect = sub_surf.get_rect(center=(config.WINDOW_WIDTH // 2, config.MENU_SUBTITLE_Y))
         screen.blit(sub_surf, sub_rect)
 
-        # Heading: ÜBER dem Schiff
+        # Heading
         heading_font = pygame.font.Font(None, config.FONT_SIZE_LARGE)
-        heading = heading_font.render("CREATE GAME", True, config.COLOR_WHITE)
+        heading = heading_font.render("JOIN GAME", True, config.COLOR_WHITE)
         heading_rect = heading.get_rect(center=(config.WINDOW_WIDTH // 2, self.heading_y - 30))
         screen.blit(heading, heading_rect)
 
         # Labels
         label_font = pygame.font.Font(None, config.FONT_SIZE_SMALL)
-        host_lbl = label_font.render("Host's Name:", True, config.COLOR_LIGHT_GRAY)
+        host_lbl = label_font.render("Your Name:", True, config.COLOR_LIGHT_GRAY)
         screen.blit(host_lbl, host_lbl.get_rect(center=(config.WINDOW_WIDTH // 2, self.name_rect.y - 22)))
 
         room_lbl = label_font.render("Room Code:", True, config.COLOR_LIGHT_GRAY)

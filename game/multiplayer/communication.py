@@ -13,12 +13,13 @@ import game.config as config
 
 def _check_connection_loop():
     """Connects to the multiplayer server and returns True if successful, False otherwise."""
-    while mconfig.CHECK_CONNECTION:
-        try:
-            response = requests.get(mconfig.MULTIPLAYER_SERVER_URL)
-            mconfig.connection_status(status=True)
-        except requests.exceptions.ConnectionError:
-            mconfig.connection_status(status=False)
+    while True:
+        if mconfig.CHECK_CONNECTION:
+            try:
+                response = requests.get(mconfig.MULTIPLAYER_SERVER_URL)
+                mconfig.connection_status(status=True)
+            except requests.exceptions.ConnectionError:
+                mconfig.connection_status(status=False)
 
         time.sleep(mconfig.CHECK_CONNECTION_INTERVAL)
 
@@ -34,9 +35,8 @@ def _start_check_connection_thread():
 
 
 
-def create_game(payload: CreateGame):
+def create_game():
     """Creates a new game on the multiplayer server."""
-    response = requests.post(mconfig.MULTIPLAYER_SERVER_URL + "games", json=payload.model_dump())
+    response = requests.post(mconfig.MULTIPLAYER_SERVER_URL + "games")
     response = response.json()
-    print(response)
-    mconfig.change_vars(code=response["code"], player_token=response["player_token"], role=response["role"], name=payload.name)
+    mconfig.change_vars(code=response["code"], player_token=response["player_token"], role=response["role"])

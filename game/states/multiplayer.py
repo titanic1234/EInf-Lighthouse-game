@@ -81,7 +81,7 @@ class MultiplayerState(BaseState):
         self.game_manager.change_state(config.STATE_MENU)
 
     def _create_game(self):
-        create_game(CreateGame(name="Test"))
+        create_game()
         self.game_manager.change_state(config.STATE_MULTIPLAYER_CREATE)
 
     def _join_game(self):
