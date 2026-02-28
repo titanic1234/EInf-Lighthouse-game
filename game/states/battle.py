@@ -37,6 +37,7 @@ class BattleState(BaseState):
         self.computer_delay = 0
         self.computer_delay_time = config.BATTLE_COMPUTER_DELAY_TIME
 
+        self.game_over_delay = config.BATTLE_GAME_OVER_DELAY
         self.game_over_timer = None
 
         # Effekte
@@ -511,7 +512,7 @@ class BattleState(BaseState):
     def _end_game(self):
         """Beendet das Spiel"""
         self.game_manager.winner = self.winner
-        self.game_over_timer = 0.75
+        self.game_over_timer = self.game_over_delay
 
     def _draw_ability_buttons(self, screen):
         for name, rect in self.ability_buttons:
