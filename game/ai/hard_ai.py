@@ -44,7 +44,7 @@ class HardComputerAI(NormalComputerAI):
             return True
 
         two_cell_destroyed = any(
-            ship.get_size() == 2 and ship.get_height() == 1 and ship.is_destroyed() for ship in board.ships
+            ship.get_size() == 2 and ship.is_destroyed() for ship in board.ships
         )
         if two_cell_destroyed and not self._has_open_targets(board):
             return True

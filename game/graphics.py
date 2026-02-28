@@ -28,59 +28,46 @@ _THEME_UI_SPRITE_MAP = {
     "MODERN": {
         "water": "ui_modern_water_cell.png",
         "ship_fallback": "ui_modern_ship_cell.png",
-        "hit": "ui_modern_hit.png",
-        "miss": "ui_modern_miss.png",
-        "destroyed": "ui_modern_destroyed.png",
-        "scan": "ui_modern_scan.png",
-        "scan_found": "ui_modern_scan_found.png",
+        "hit": "ui_generic_hit.png",
+        "miss": "ui_generic_miss.png",
+        "destroyed": "ui_generic_destroyed.png",
+        "scan": "ui_generic_scan.png",
+        "scan_found": "ui_generic_scan_found.png",
         "title_art": "ui_modern_title_art.png",
     },
     "PIRATE": {
         "water": "ui_pirate_water_cell.png",
         "ship_fallback": "ui_pirate_ship_cell.png",
-        "hit": "ui_pirate_hit.png",
-        "miss": "ui_pirate_miss.png",
-        "destroyed": "ui_pirate_destroyed.png",
-        "scan": "ui_pirate_scan.png",
-        "scan_found": "ui_pirate_scan_found.png",
+        "hit": "ui_generic_hit.png",
+        "miss": "ui_generic_miss.png",
+        "destroyed": "ui_generic_destroyed.png",
+        "scan": "ui_generic_scan.png",
+        "scan_found": "ui_generic_scan_found.png",
         "title_art": "ui_pirate_title_art.png",
     },
-}
-
-_GENERIC_UI_SPRITE_MAP = {
-    "water": "ui_generic_water_cell.png",
-    "ship_fallback": "ui_generic_ship_cell.png",
-    "hit": "ui_generic_hit.png",
-    "miss": "ui_generic_miss.png",
-    "destroyed": "ui_generic_destroyed.png",
-    "scan": "ui_generic_scan.png",
-    "scan_found": "ui_generic_scan_found.png",
-    "title_art": "ui_generic_title_art.png",
 }
 
 
 def _get_ui_sprite(sprite_name):
     theme_name = theme_manager.current.name
     theme_filename = _THEME_UI_SPRITE_MAP.get(theme_name, {}).get(sprite_name)
-    generic_filename = _GENERIC_UI_SPRITE_MAP.get(sprite_name)
 
-    for filename in (theme_filename, generic_filename):
-        if not filename:
-            continue
+    if not theme_filename:
+        return None
 
-        cache_key = ("ui", filename)
-        if cache_key not in _UI_SPRITE_CACHE:
-            sprite_path = os.path.join("images", filename)
-            if not os.path.exists(sprite_path):
-                continue
-            try:
-                _UI_SPRITE_CACHE[cache_key] = pygame.image.load(sprite_path).convert_alpha()
-            except pygame.error:
-                continue
+    cache_key = ("ui", theme_filename)
+    if cache_key not in _UI_SPRITE_CACHE:
+        sprite_path = os.path.join("images", theme_filename)
+        if not os.path.exists(sprite_path):
+            return None
+        try:
+            _UI_SPRITE_CACHE[cache_key] = pygame.image.load(sprite_path).convert_alpha()
+        except pygame.error:
+            return None
 
-        sprite_surface = _UI_SPRITE_CACHE.get(cache_key)
-        if sprite_surface is not None:
-            return sprite_surface
+    sprite_surface = _UI_SPRITE_CACHE.get(cache_key)
+    if sprite_surface is not None:
+        return sprite_surface
 
     return None
 
@@ -290,6 +277,10 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True):
         and ((show_ships and not is_enemy) or (is_enemy and (show_ships or cell.status == config.CELL_DESTROYED)))
     )
 
+    # Grid-Linien
+    grid_color = theme.color_grid_player if not is_enemy else theme.color_grid_enemy
+    pygame.draw.rect(screen, grid_color, cell_rect, 1)
+
     # Schiff
     if should_show_ship:
         ship_image_drawn = _draw_ship_cell_image(screen, x, y, cell)
@@ -299,6 +290,20 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True):
                 ship_scaled = pygame.transform.smoothscale(ship_fallback, (config.CELL_SIZE, config.CELL_SIZE))
                 screen.blit(ship_scaled, cell_rect)
 
+    if cell.scan_marked and not cell.is_shot():
+        scan_name = "scan_found" if cell.scan_found_ship else "scan"
+        scan_sprite = _get_ui_sprite(scan_name)
+        if scan_sprite:
+            scan_scaled = scale_sprite_to_cell(scan_sprite, config.CELL_SIZE, fill_ratio=0.65)
+            screen.blit(scan_scaled, scan_scaled.get_rect(center=cell_rect.center))
+
+    if cell.napalm_marked and not cell.is_shot():
+        icon = _get_status_icon("napalm")
+        if icon:
+            icon_surf = scale_sprite_to_cell(icon, config.CELL_SIZE, fill_ratio=0.78)
+            screen.blit(icon_surf, icon_surf.get_rect(center=cell_rect.center))
+
+        # Hit/Miss
         if cell.status == config.CELL_HIT:
             hit_sprite = _get_ui_sprite("hit")
             if hit_sprite:
@@ -315,23 +320,6 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True):
                 destroyed_scaled = scale_sprite_to_cell(destroyed_sprite, config.CELL_SIZE, fill_ratio=0.95)
                 screen.blit(destroyed_scaled, destroyed_scaled.get_rect(center=cell_rect.center))
 
-    if cell.scan_marked and not cell.is_shot():
-        scan_name = "scan_found" if cell.scan_found_ship else "scan"
-        scan_sprite = _get_ui_sprite(scan_name)
-        if scan_sprite:
-            scan_scaled = scale_sprite_to_cell(scan_sprite, config.CELL_SIZE, fill_ratio=0.65)
-            screen.blit(scan_scaled, scan_scaled.get_rect(center=cell_rect.center))
-
-    if cell.napalm_marked and not cell.is_shot():
-        icon = _get_status_icon("napalm")
-        if icon:
-            icon_surf = scale_sprite_to_cell(icon, config.CELL_SIZE, fill_ratio=0.78)
-            screen.blit(icon_surf, icon_surf.get_rect(center=cell_rect.center))
-
-    # Grid-Linien (Subtle)
-    grid_color = theme.color_grid_player if not is_enemy else theme.color_grid_enemy
-    pygame.draw.rect(screen, grid_color, cell_rect, 1)
-
 
 def draw_title_art(screen):
     """Zeichnet Artwork Sprite für menü"""
@@ -344,7 +332,12 @@ def draw_title_art(screen):
     scale_factor = target_w / max(1, title_sprite.get_width())
     target_h = max(1, int(title_sprite.get_height() * scale_factor))
     scaled = pygame.transform.smoothscale(title_sprite, (target_w, target_h))
-    rect = scaled.get_rect(center=(center_x, 560))
+    # Positioning zwischen Titel und Button-Zeile.
+    max_bottom = config.MENU_BUTTON_Y - 35
+    target_center_y = (config.MENU_SUBTITLE_Y + max_bottom) // 2
+    rect = scaled.get_rect(center=(center_x, target_center_y))
+    if rect.bottom > max_bottom:
+        rect.bottom = max_bottom
     screen.blit(scaled, rect)
 
 
