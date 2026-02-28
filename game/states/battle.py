@@ -511,7 +511,7 @@ class BattleState(BaseState):
     def _end_game(self):
         """Beendet das Spiel"""
         self.game_manager.winner = self.winner
-        self.game_over_timer = 2000
+        self.game_over_timer = 0.75
 
     def _draw_ability_buttons(self, screen):
         for name, rect in self.ability_buttons:
