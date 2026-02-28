@@ -107,7 +107,6 @@ class MenuState(BaseState):
             )
         )
 
-        print(self.buttons)
 
     def _toggle_theme(self):
         theme_manager.toggle()

@@ -1,3 +1,5 @@
+# multiplayer.py
+
 import pygame
 import game.config as config
 from game.graphics import draw_gradient_background, GlowButton, draw_title_art
@@ -80,7 +82,7 @@ class MultiplayerState(BaseState):
 
     def _create_game(self):
         create_game(CreateGame(name="Test"))
-        #self.game_manager.change_state(config.STATE_MULTIPLAYER_CREATE)
+        self.game_manager.change_state(config.STATE_MULTIPLAYER_CREATE)
 
     def _join_game(self):
         self.game_manager.change_state(config.STATE_MULTIPLAYER_JOIN)

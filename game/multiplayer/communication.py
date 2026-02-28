@@ -16,7 +16,6 @@ def _check_connection_loop():
     while mconfig.CHECK_CONNECTION:
         try:
             response = requests.get(mconfig.MULTIPLAYER_SERVER_URL)
-            print(response.json())
             mconfig.connection_status(status=True)
         except requests.exceptions.ConnectionError:
             mconfig.connection_status(status=False)
