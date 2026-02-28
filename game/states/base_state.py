@@ -14,5 +14,5 @@ class BaseState:
     def on_mouse_down(self, pos, button):
         """Optionaler Mausklick-Handler."""
 
-    def on_key_down(self, key):
+    def on_key_down(self, key, mod=0):
         """Optionaler Tastatur-Handler."""

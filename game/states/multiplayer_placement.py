@@ -3,7 +3,7 @@ Schiffsplatzierungs-State (Multiplayer)
 Spieler platziert seine Schiffe, wartet auf Gegner, Ready/Start Logik
 """
 
-import pygame
+from pgzero.keyboard import keys
 from pygame import Rect
 
 import game.config as config
@@ -277,8 +277,8 @@ class MultiplayerPlacementState(BaseState):
                 self.preview_position = None
                 self.placement_valid = False
 
-    def on_key_down(self, key):
-        if key == pygame.K_r and self.selected_ship:
+    def on_key_down(self, key, mod=0):
+        if key == keys.R and self.selected_ship:
             self.current_orientation = (self.current_orientation + 1) % self.selected_ship.get_rotation_count()
 
     def on_resize(self, width, height):

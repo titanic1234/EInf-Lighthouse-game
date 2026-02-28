@@ -1,5 +1,6 @@
 import pgzrun
 import pygame
+from pgzero.keyboard import keys
 import game.config as config
 from game.game_manager import GameManager
 from game.multiplayer.communication import _start_check_connection_thread
@@ -33,12 +34,12 @@ def draw():
 def on_mouse_down(pos, button):
     game_manager.on_mouse_down(pos, button)
 
-def on_key_down(key):
-    game_manager.on_key_down(key)
-    if key == pygame.K_ESCAPE:
+def on_key_down(key, mod=0):
+    game_manager.on_key_down(key, mod)
+    if key == keys.ESCAPE:
         import sys
         sys.exit()
-    elif key == pygame.K_F11:
+    elif key == keys.F11:
         try:
             if not config.WINDOW_FULLSCREEN:
                 screen.surface = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN)
@@ -52,4 +53,3 @@ def on_key_down(key):
 
 
 pgzrun.go()
-

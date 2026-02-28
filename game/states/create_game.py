@@ -1,6 +1,8 @@
 # create_game.py
 
 import pygame
+from pgzero.keyboard import keys
+from pgzero.builtins import keymods
 import random
 import string
 
@@ -174,16 +176,16 @@ class CreateGameState(BaseState):
         # Klick außerhalb -> Fokus weg
         self.focus = None
 
-    def on_key_down(self, key):
-        if key == pygame.K_ESCAPE:
+    def on_key_down(self, key, mod=0):
+        if key == keys.ESCAPE:
             self._back_menu()
             return
 
-        if key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+        if key in (keys.RETURN, keys.KP_ENTER):
             self._start_game()
             return
 
-        if key == pygame.K_TAB:
+        if key == keys.TAB:
             if self.room_locked:
                 self.focus = "name"
             else:
@@ -191,7 +193,7 @@ class CreateGameState(BaseState):
             self.cursor_t = 0.0
             return
 
-        if key == pygame.K_BACKSPACE:
+        if key == keys.BACKSPACE:
             if self.focus == "name" and self.name_text:
                 self.name_text = self.name_text[:-1]
             elif self.focus == "room" and (not self.room_locked) and self.room_text:
@@ -199,7 +201,7 @@ class CreateGameState(BaseState):
             return
 
         # STRG+C kopiert Room Code
-        if key == pygame.K_c and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+        if key == keys.C and (mod & keymods.CTRL):
             self._copy_room_code()
             return
 
@@ -208,34 +210,34 @@ class CreateGameState(BaseState):
             return
 
         # Nur Zeichen, wenn kein Ctrl/Alt gedrückt ist
-        mods = pygame.key.get_mods()
-        if mods & (pygame.KMOD_CTRL | pygame.KMOD_ALT | pygame.KMOD_META):
+        mods = mod
+        if mods & (keymods.CTRL | keymods.ALT | keymods.META):
             return
 
         ch = None
 
         # Buchstaben
-        if pygame.K_a <= key <= pygame.K_z:
+        if keys.A <= key <= keys.Z:
             ch = chr(key)
             # Shift => Großbuchstaben
-            if mods & pygame.KMOD_SHIFT:
+            if mods & keymods.SHIFT:
                 ch = ch.upper()
 
         # Zahlen
-        elif pygame.K_0 <= key <= pygame.K_9:
+        elif keys.K_0 <= key <= keys.K_9:
             ch = chr(key)
 
         # Space
-        elif key == pygame.K_SPACE:
+        elif key == keys.SPACE:
             ch = " "
 
         # ein paar sinnvolle Zeichen
-        elif key in (pygame.K_MINUS, pygame.K_PERIOD, pygame.K_COMMA, pygame.K_UNDERSCORE):
+        elif key in (keys.MINUS, keys.PERIOD, keys.COMMA, keys.UNDERSCORE):
             mapping = {
-                pygame.K_MINUS: "-",
-                pygame.K_PERIOD: ".",
-                pygame.K_COMMA: ",",
-                pygame.K_UNDERSCORE: "_",
+                keys.MINUS: "-",
+                keys.PERIOD: ".",
+                keys.COMMA: ",",
+                keys.UNDERSCORE: "_",
             }
             ch = mapping.get(key)
 

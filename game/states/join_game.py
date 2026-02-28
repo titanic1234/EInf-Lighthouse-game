@@ -1,7 +1,8 @@
 # join_game.py
 
 import pygame
-
+from pgzero.keyboard import keys
+from pgzero.builtins import keymods
 import game.config as config
 from game.graphics import draw_gradient_background, GlowButton, draw_title_art
 from game.states.base_state import BaseState
@@ -111,17 +112,17 @@ class JoinGameState(BaseState):
 
         self.focus = None
 
-    def on_key_down(self, key):
-        if key == pygame.K_ESCAPE:
+    def on_key_down(self, key, mod=0):
+        if key == keys.ESCAPE:
             self._back_menu()
             return
 
-        if key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+        if key in (keys.RETURN, keys.KP_ENTER):
             if len(self.room_text) == self.room_max_len:
                 self._start_game()
             return
 
-        if key == pygame.K_TAB:
+        if key == keys.TAB:
             if self.room_locked:
                 self.focus = "name"
             else:
@@ -129,7 +130,7 @@ class JoinGameState(BaseState):
             self.cursor_t = 0.0
             return
 
-        if key == pygame.K_BACKSPACE:
+        if key == keys.BACKSPACE:
             if self.focus == "name" and self.name_text:
                 self.name_text = self.name_text[:-1]
             elif self.focus == "room" and (not self.room_locked) and self.room_text:
@@ -137,31 +138,31 @@ class JoinGameState(BaseState):
             return
 
         # -------- Texteingabe über KEYDOWN (funktioniert immer) --------
-        mods = pygame.key.get_mods()
-        if mods & (pygame.KMOD_CTRL | pygame.KMOD_ALT | pygame.KMOD_META):
+        mods = mod
+        if mods & (keymods.CTRL | keymods.ALT | keymods.META):
             return
 
         # Name: Buchstaben/Zahlen/Space usw.
         if self.focus == "name":
             ch = None
 
-            if pygame.K_a <= key <= pygame.K_z:
+            if keys.A <= key <= keys.Z:
                 ch = chr(key)
-                if mods & pygame.KMOD_SHIFT:
+                if mods & keymods.SHIFT:
                     ch = ch.upper()
 
-            elif pygame.K_0 <= key <= pygame.K_9:
+            elif keys.K_0 <= key <= keys.K_9:
                 ch = chr(key)
 
-            elif key == pygame.K_SPACE:
+            elif key == keys.SPACE:
                 ch = " "
 
-            elif key in (pygame.K_MINUS, pygame.K_PERIOD, pygame.K_COMMA, pygame.K_UNDERSCORE):
+            elif key in (keys.MINUS, keys.PERIOD, keys.COMMA, keys.UNDERSCORE):
                 mapping = {
-                    pygame.K_MINUS: "-",
-                    pygame.K_PERIOD: ".",
-                    pygame.K_COMMA: ",",
-                    pygame.K_UNDERSCORE: "_",
+                    keys.MINUS: "-",
+                    keys.PERIOD: ".",
+                    keys.COMMA: ",",
+                    keys.UNDERSCORE: "_",
                 }
                 ch = mapping.get(key)
 
@@ -174,12 +175,12 @@ class JoinGameState(BaseState):
                 return
 
             # A-Z
-            if pygame.K_a <= key <= pygame.K_z:
+            if keys.A <= key <= keys.Z:
                 self.room_text += chr(key).upper()
                 return
 
             # 0-9
-            if pygame.K_0 <= key <= pygame.K_9:
+            if keys.K_0 <= key <= keys.K_9:
                 self.room_text += chr(key)
                 return
 

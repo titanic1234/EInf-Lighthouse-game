@@ -108,12 +108,13 @@ class GameManager:
         if self.current_state:
             self.current_state.on_mouse_down(pos, button)
 
-    def on_key_down(self, key):
+    def on_key_down(self, key, mod=0):
         """
         Delegiert Tasteneingaben an den aktuellen State
 
         Args:
             key: Taste (pgzero key)
+            mod: keymod (pgzero mod)
         """
         if self.current_state:
-            self.current_state.on_key_down(key)
+            self.current_state.on_key_down(key, mod)

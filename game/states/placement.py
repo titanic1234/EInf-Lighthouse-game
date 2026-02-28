@@ -3,7 +3,7 @@ Schiffsplatzierungs-State
 Spieler platziert seine Schiffe auf dem Board
 """
 
-import pygame
+from pgzero.keyboard import keys
 from pygame import Rect
 import game.config as config
 from game.entities.board import Board
@@ -191,10 +191,10 @@ class PlacementState(BaseState):
                 self.placement_valid = False
 
 
-    def on_key_down(self, key):
+    def on_key_down(self, key, mod=0):
         """Behandelt Tasteneingaben"""
-        # R-Taste: Rotation
-        if key == pygame.K_r and self.selected_ship:
+        # Rotation
+        if key == keys.R and self.selected_ship:
             self.current_orientation = (self.current_orientation + 1) % self.selected_ship.get_rotation_count()
 
     def _start_battle(self):
