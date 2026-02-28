@@ -37,6 +37,8 @@ class BattleState(BaseState):
         self.computer_delay = 0
         self.computer_delay_time = config.BATTLE_COMPUTER_DELAY_TIME
 
+        self.game_over_timer = None
+
         # Effekte
         self.particles = ParticleSystem()
 
@@ -114,6 +116,11 @@ class BattleState(BaseState):
     def update(self, dt, mouse_pos):
         """Aktualisiert die Kampfphase"""
         self.particles.update(dt)
+
+        if self.game_over_timer is not None:
+            self.game_over_timer -= dt
+            if self.game_over_timer <= 0:
+                self.game_manager.change_state(config.STATE_GAME_OVER)
 
         if self.game_over:
             return
@@ -381,9 +388,9 @@ class BattleState(BaseState):
                 self.message = f"ENEMY SONAR DETECTED CONTACTS AT {len(found)} POSITIONS."
             else:
                 self.message = "ENEMY SONAR: NO CONTACTS."
-                self.player_turn = True
-                self.message += " - YOUR TURN!"
-                return
+            self.player_turn = True
+            self.message += " - YOUR TURN!"
+            return
 
         if action_type == "airstrike":
             hit = self._computer_airstrike(action["row"], action["col"])
@@ -504,7 +511,7 @@ class BattleState(BaseState):
     def _end_game(self):
         """Beendet das Spiel"""
         self.game_manager.winner = self.winner
-        self.game_manager.change_state(config.STATE_GAME_OVER)
+        self.game_over_timer = 2000
 
     def _draw_ability_buttons(self, screen):
         for name, rect in self.ability_buttons:

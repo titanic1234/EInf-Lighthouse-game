@@ -23,7 +23,7 @@ class BaseComputerAI:
 
     def register_sonar_findings(self, found_positions):
         for pos in found_positions:
-            self.sonar_miss_poitions.discard(pos)
+            self.sonar_miss_positions.discard(pos)
             if pos not in self.tried_positions:
                 self.known_ship_cells.add(pos)
 
