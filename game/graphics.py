@@ -33,6 +33,7 @@ _THEME_UI_SPRITE_MAP = {
         "destroyed": "ui_generic_destroyed.png",
         "scan": "ui_generic_scan.png",
         "scan_found": "ui_generic_scan_found.png",
+        "player_marker": "ui_generic_player_marker.png",
         "title_art": "ui_modern_title_art.png",
     },
     "PIRATE": {
@@ -43,6 +44,7 @@ _THEME_UI_SPRITE_MAP = {
         "destroyed": "ui_generic_destroyed.png",
         "scan": "ui_generic_scan.png",
         "scan_found": "ui_generic_scan_found.png",
+        "player_marker": "ui_generic_player_marker.png",
         "title_art": "ui_pirate_title_art.png",
     },
 }
@@ -302,6 +304,12 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True):
         if icon:
             icon_surf = scale_sprite_to_cell(icon, config.CELL_SIZE, fill_ratio=0.78)
             screen.blit(icon_surf, icon_surf.get_rect(center=cell_rect.center))
+
+    if cell.player_marker and not cell.is_shot() and not cell.scan_marked and not cell.napalm_marked:
+        marker_sprite = _get_ui_sprite("player_marker")
+        if marker_sprite:
+            marker_scaled = scale_sprite_to_cell(marker_sprite, config.CELL_SIZE, fill_ratio=0.62)
+            screen.blit(marker_scaled, marker_scaled.get_rect(center=cell_rect.center))
 
         # Hit/Miss
     if cell.status == config.CELL_HIT:

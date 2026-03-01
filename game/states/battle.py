@@ -135,7 +135,11 @@ class BattleState(BaseState):
 
     def on_mouse_down(self, pos, button):
         """Behandelt Mausklicks"""
-        if button != 1 or not self.player_turn or self.game_over:
+        if button not in (1, 3) or not self.player_turn or self.game_over:
+            return
+
+        if button == 3:
+            self._toggle_player_marker(pos)
             return
 
         for name, rect in self.ability_buttons:
@@ -157,6 +161,22 @@ class BattleState(BaseState):
         else:
             self._player_shoot(row, col)
 
+    def _toggle_player_marker(self, pos):
+        cell_pos = self.computer_board.get_cell_at_pos(pos[0], pos[1])
+        if not cell_pos:
+            return
+
+        row, col = cell_pos
+        cell = self.computer_board.get_cell(row, col)
+        if not cell:
+            return
+
+        # Marker nur auf aktuell neutralen Feldern erlauben.
+        if cell.is_shot() or cell.scan_marked or cell.napalm_marked:
+            return
+
+        cell.player_marker = not cell.player_marker
+
     def _spawn_effects(self, board, row, col, hit):
         """Spawnt Partikel an der getroffenen Zelle"""
         x = board.x_offset + col * config.CELL_SIZE + config.CELL_SIZE // 2
@@ -175,6 +195,7 @@ class BattleState(BaseState):
         self.game_manager.shots_fired += 1
         cell.scan_marked = False
         cell.scan_found_ship = False
+        cell.player_marker = False
 
         if not cell.has_ship():
             cell.napalm_marked = True
@@ -275,6 +296,7 @@ class BattleState(BaseState):
                     continue
                 cell.scan_marked = True
                 cell.scan_found_ship = cell.has_ship()
+                cell.player_marker = False
                 if cell.has_ship():
                     found_positions.append((r + 1, c + 1))
 
