@@ -23,6 +23,7 @@ class Cell:
         self.scan_marked = False
         self.scan_found_ship = False
         self.napalm_marked = False
+        self.player_marker = False
 
     def has_ship(self):
         """Prüft, ob die Zelle ein Schiff enthält"""
@@ -58,6 +59,7 @@ class Cell:
         self.scan_marked = False
         self.scan_found_ship = False
         self.napalm_marked = False
+        self.player_marker = False
 
         if self.has_ship():
             self.status = CELL_HIT
@@ -78,6 +80,7 @@ class Cell:
         self.scan_marked = False
         self.scan_found_ship = False
         self.napalm_marked = False
+        self.player_marker = False
 
     def __repr__(self):
         status_symbols = {
