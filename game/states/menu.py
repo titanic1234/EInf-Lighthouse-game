@@ -7,7 +7,6 @@ import game.config as config
 from game.graphics import draw_gradient_background, GlowButton, draw_title_art
 from game.theme import theme_manager
 from game.states.base_state import BaseState
-import game.theme as theme
 import game.multiplayer.multiplayer_config as mconfig
 
 
@@ -29,11 +28,11 @@ class MenuState(BaseState):
         """Erstellt die Menue-Buttons"""
         center_x = config.WINDOW_WIDTH // 2
         start_y = config.MENU_BUTTON_Y
-        theme = theme_manager.current
+        current_theme = theme_manager.current
         self.toggle_text = ""
         self.difficulty_text = ""
 
-        if theme.name == "MODERN":
+        if current_theme.name == "MODERN":
             self.toggle_text = "PIRATEN MODUS"
         else:
             self.toggle_text = "CLASSIC MODUS"
@@ -49,13 +48,12 @@ class MenuState(BaseState):
         total_main_width = main_button_width * 3 + column_gap * 2
         row_one_start = center_x - total_main_width // 2
 
-        multiplayer_text = "Multiplayer" if mconfig.CONNECTION else "Multiplayer (Offline)"
-        multiplayer_action = self._start_multiplayer if mconfig.CONNECTION else self._do_nothing
+        multiplayer_text, multiplayer_action = self._multiplayer_button_state()
 
         row_one_buttons = [
-            (theme.text_start_btn, self._start_game),
+            (current_theme.text_start_btn, self._start_game),
             (multiplayer_text, multiplayer_action),
-            (theme.text_quit_btn, self._quit_game),
+            (current_theme.text_quit_btn, self._quit_game),
         ]
 
         self.buttons = []
@@ -100,6 +98,17 @@ class MenuState(BaseState):
         self.buttons = []
         self._create_buttons()
 
+    def _multiplayer_button_state(self):
+        if mconfig.CONNECTION:
+            return "Multiplayer", self._start_multiplayer
+        return "Multiplayer (Offline)", self._do_nothing
+
+    def _update_multiplayer_button(self):
+        multiplayer_button = self.buttons[1]
+        label, action = self._multiplayer_button_state()
+        multiplayer_button.text = label
+        multiplayer_button.action = action
+
     def _start_game(self):
         """Startet ein neues Spiel"""
         self.game_manager.change_state(config.STATE_PLACEMENT)
@@ -139,14 +148,7 @@ class MenuState(BaseState):
         for button in self.buttons:
             button.update(dt, mouse_x, mouse_y)
 
-        multiplayer_button = self.buttons[1]
-        if mconfig.CONNECTION and multiplayer_button.text == "Multiplayer (Offline)":
-            multiplayer_button.text = "Multiplayer"
-            multiplayer_button.action = self._start_multiplayer
-        elif not mconfig.CONNECTION and multiplayer_button.text == "Multiplayer":
-            multiplayer_button.text = "Multiplayer (Offline)"
-            multiplayer_button.action = self._do_nothing
-
+        self._update_multiplayer_button()
 
 
     def on_mouse_down(self, pos, button):
@@ -159,7 +161,7 @@ class MenuState(BaseState):
 
     def draw(self, screen):
         """Zeichnet das Menue"""
-        theme = theme_manager.current
+        current_theme = theme_manager.current
         # Premium Gradient Background
         draw_gradient_background(screen, time_value=self.game_manager.time_elapsed)
 
@@ -170,12 +172,12 @@ class MenuState(BaseState):
         title_font = pygame.font.Font(None, config.MENU_TITLE_FONT_SIZE)
 
         # Shadow
-        shadow_surf = title_font.render(theme.text_title, True, (0, 0, 0))
+        shadow_surf = title_font.render(current_theme.text_title, True, (0, 0, 0))
         shadow_rect = shadow_surf.get_rect(center=(config.WINDOW_WIDTH // 2, config.MENU_TITLE_Y + 4))
         screen.blit(shadow_surf, shadow_rect)
 
         # Main Title (Glowing)
-        title_surf = title_font.render(theme.text_title, True, theme.color_text_primary)
+        title_surf = title_font.render(current_theme.text_title, True, current_theme.color_text_primary)
         title_rect = title_surf.get_rect(center=(config.WINDOW_WIDTH // 2, config.MENU_TITLE_Y))
         screen.blit(title_surf, title_rect)
 

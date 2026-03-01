@@ -2,10 +2,7 @@
 Board-Klasse für das Spielfeld
 """
 
-from game.config import (
-    GRID_SIZE, CELL_SIZE, ORIENTATION_HORIZONTAL, ORIENTATION_VERTICAL,
-    CELL_SHIP, SHIP_TYPES
-)
+from game.config import GRID_SIZE, CELL_SIZE, SHIP_TYPES
 from game.entities.cell import Cell
 from game.entities.ship import Ship
 import random

@@ -3,8 +3,6 @@ import os
 import random
 import pygame
 import game.config as config
-from game.config import CELL_SIZE
-from game.entities import ship
 from game.ui.buttons import BaseButton
 from game.theme import theme_manager
 

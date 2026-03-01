@@ -6,17 +6,13 @@ from game.ai.base_ai import BaseComputerAI
 
 
 class NormalComputerAI(BaseComputerAI):
+    DEFAULT_ABILITIES = {"airstrike": 1, "guided": 1, "sonar": 1, "napalm": 1,}
     def __init__(self):
         super().__init__()
         self.parity_offset = random.randint(0, 1)
         self.diagonal_offset = random.randint(0, 3)
         self.hunt_queue = []
-        self.abilities = {
-            "airstrike": 1,
-            "guided": 1,
-            "sonar": 1,
-            "napalm": 1,
-        }
+        self.abilities = dict(self.DEFAULT_ABILITIES)
 
     def choose_action(self, board):
         available_abilities = [name for name, charges in self.abilities.items() if charges > 0]
@@ -72,4 +68,4 @@ class NormalComputerAI(BaseComputerAI):
         self.hunt_queue = []
         self.parity_offset = random.randint(0, 1)
         self.diagonal_offset = random.randint(0, 3)
-        self.abilities = {"airstrike": 1, "guided": 1, "sonar": 1, "napalm": 1}
+        self.abilities = dict(self.DEFAULT_ABILITIES)

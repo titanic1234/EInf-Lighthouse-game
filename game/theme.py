@@ -1,6 +1,3 @@
-from game.entities import ship
-
-
 class Theme:
     def __init__(self, name):
         self.name = name

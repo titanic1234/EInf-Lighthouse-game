@@ -3,7 +3,6 @@ Game-Over-State
 Zeigt Gewinner und Optionen an
 """
 
-from pygame import Rect
 import game.config as config
 from game.states.base_state import BaseState
 from game.graphics import draw_text, draw_gradient_background, GlowButton
@@ -30,41 +29,23 @@ class GameOverState(BaseState):
         center_x = config.WINDOW_WIDTH // 2
         start_y = config.WINDOW_HEIGHT // 2 + 50
 
-        # "Neues Spiel" Button
-        self.buttons.append(
-            GlowButton(
-                center_x,
-                start_y,
-                config.GAME_OVER_BUTTON_WIDTH,
-                config.GAME_OVER_BUTTON_HEIGHT,
-                "NEUES SPIEL",
-                self._new_game,
-            )
-        )
+        button_specs = [
+            ("NEUES SPIEL", self._new_game),
+            ("ZUM MENÜ", self._main_menu),
+            ("BEENDEN", self._quit_game),
+        ]
 
-        # "Hauptmenue" Button
-        self.buttons.append(
-            GlowButton(
-                center_x,
-                start_y + config.GAME_OVER_BUTTON_SPACING,
-                config.GAME_OVER_BUTTON_WIDTH,
-                config.GAME_OVER_BUTTON_HEIGHT,
-                "ZUM MENÜ",
-                self._main_menu,
+        for index, (label, action) in enumerate(button_specs):
+            self.buttons.append(
+                GlowButton(
+                    center_x,
+                    start_y + config.GAME_OVER_BUTTON_SPACING * index,
+                    config.GAME_OVER_BUTTON_WIDTH,
+                    config.GAME_OVER_BUTTON_HEIGHT,
+                    label,
+                    action,
+                )
             )
-        )
-
-        # "Beenden" Button
-        self.buttons.append(
-            GlowButton(
-                center_x,
-                start_y + config.GAME_OVER_BUTTON_SPACING * 2,
-                config.GAME_OVER_BUTTON_WIDTH,
-                config.GAME_OVER_BUTTON_HEIGHT,
-                "BEENDEN",
-                self._quit_game,
-            )
-        )
 
     def _new_game(self):
         """Startet ein neues Spiel"""

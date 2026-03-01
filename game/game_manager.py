@@ -3,13 +3,17 @@ Game-Manager
 Verwaltet alle Spielzustände (States) und koordiniert das Spiel
 """
 
-from game.config import STATE_MENU, STATE_PLACEMENT, STATE_BATTLE, STATE_GAME_OVER, STATE_MULTIPLAYER_PLACEMENT
 from game.config import (
+    STATE_MENU,
+    STATE_PLACEMENT,
+    STATE_BATTLE,
+    STATE_GAME_OVER,
     STATE_MULTIPLAYER_MENU,
     STATE_MULTIPLAYER_WAITING,
     STATE_MULTIPLAYER_GAME,
     STATE_MULTIPLAYER_CREATE,
-    STATE_MULTIPLAYER_JOIN
+    STATE_MULTIPLAYER_JOIN,
+    STATE_MULTIPLAYER_PLACEMENT,
 )
 from game.states.menu import MenuState
 from game.states.placement import PlacementState

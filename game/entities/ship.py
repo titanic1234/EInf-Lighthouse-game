@@ -2,7 +2,7 @@
 Ship-Klasse für Schiffe
 """
 
-from game.config import ORIENTATION_HORIZONTAL, ORIENTATION_VERTICAL
+from game.config import ORIENTATION_HORIZONTAL
 
 
 class Ship:
