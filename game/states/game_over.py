@@ -165,28 +165,6 @@ class GameOverState(BaseState):
         for button in self.buttons:
             button.draw(screen)
 
-        # Dekorative Elemente
-        if self.winner == "Player":
-            draw_text(
-                screen,
-                "OK",
-                config.WINDOW_WIDTH // 2,
-                config.WINDOW_HEIGHT - config.GAME_OVER_ICON_MARGIN_BOTTOM,
-                config.GAME_OVER_ICON_FONT_SIZE,
-                theme.color_text_secondary,
-                center=True,
-            )
-        else:
-            draw_text(
-                screen,
-                "SKULL",
-                config.WINDOW_WIDTH // 2,
-                config.WINDOW_HEIGHT - config.GAME_OVER_ICON_MARGIN_BOTTOM,
-                config.GAME_OVER_ICON_FONT_SIZE,
-                theme.color_text_enemy,
-                center=True,
-            )
-
     def on_resize(self, width, height):
         self.buttons = []
         self._create_buttons()
