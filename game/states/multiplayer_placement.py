@@ -37,6 +37,9 @@ class MultiplayerPlacementState(SharedPlacementState):
         # Buttons
         self.ready_button = self.build_primary_action_button("BEREIT", self._on_ready_clicked, 30)
 
+        if self.host:
+            self.ws.send_json({"type": "host_name", "name": mconfig.NAME})
+
 
 
     # ------------------------------
@@ -108,13 +111,9 @@ class MultiplayerPlacementState(SharedPlacementState):
             if t == "presence":
                 # Gegnername aus host_name/guest_name
                 opponent = (msg.get("guest_name") if self.host else msg.get("host_name")) or None
+                print(f"Gegner: {msg}")
                 if opponent:
                     mconfig.set_game(opponent_name=opponent)
-
-            elif t == "board_set":
-                # optional feedback
-                # msg: {"type":"board_set","role":"host/guest","host_board_set":bool,"guest_board_set":bool}
-                pass
 
             elif t == "ready_update":
                 ready = bool(msg.get("guest_ready")) and bool(msg.get("host_ready"))

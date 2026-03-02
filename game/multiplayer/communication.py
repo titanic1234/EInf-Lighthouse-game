@@ -49,5 +49,5 @@ def join_game(code: str, name: str):
     response = response.json()
     print(response)
     print(response["player_token"])
-    mconfig.change_vars(code=code, player_token=response["player_token"], role=response["role"])
+    mconfig.change_vars(code=code, player_token=response["player_token"], role=response["role"], name=name)
     return None
