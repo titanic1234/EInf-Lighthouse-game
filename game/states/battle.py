@@ -12,16 +12,15 @@ from game.entities.board import Board
 from game.ai import create_ai
 from game.graphics import draw_gradient_background, draw_rounded_rect, ParticleSystem, draw_text, draw_grid_cell
 from game.theme import theme_manager
-from game.states.base_state import BaseState
+from game.states.shared_battle import SharedBattleState
 
 
-class BattleState(BaseState):
+class BattleState(SharedBattleState):
     """Kampf-Phase: Spieler gegen Computer"""
 
     def __init__(self, game_manager):
         """Initialisiert die Kampfphase"""
         super().__init__(game_manager)
-        self.player_board = game_manager.player_board
 
         self.computer_board = Board(config.COMPUTER_GRID_X, config.GRID_OFFSET_Y, "Computer")
         self.computer_board.place_ships_randomly()
@@ -40,53 +39,10 @@ class BattleState(BaseState):
         self.game_over_delay = config.BATTLE_GAME_OVER_DELAY
         self.game_over_timer = None
 
-        # Effekte
-        self.particles = ParticleSystem()
-
-        # Special Schüsse
-        self.abilities = {
-            "airstrike": {"charges": 1, "targeted": True},
-            "guided": {"charges": 1, "targeted": False},
-            "sonar": {"charges": 1, "targeted": True},
-            "napalm": {"charges": 1, "targeted": True},
-        }
-        self.selected_ability = None
         self.active_fires = []
 
-        self.ability_buttons = []
-        self._load_ability_icons()
-        self._rebuild_ability_buttons()
 
-    def _load_icon(self, filename):
-        path = os.path.join("images", filename)
-        if not os.path.exists(path):
-            return None
-        try:
-            return pygame.image.load(path).convert_alpha()
-        except pygame.error:
-            return None
 
-    def _load_ability_icons(self):
-        is_modern = theme_manager.current.name == "MODERN"
-        self.ability_icons = {
-            "airstrike": self._load_icon("airstrike.png" if is_modern else "breitseite.png"),
-            "guided": self._load_icon("lenkrakete.png" if is_modern else "enterhaken.png"),
-            "sonar": self._load_icon("sonar.png" if is_modern else "Kraehennest.png"),
-            "napalm": self._load_icon("napalm.png" if is_modern else "griechisches_feuer.png"),
-        }
-
-    def _rebuild_ability_buttons(self):
-        size = 64
-        spacing = 20
-        total_width = size * 4 + spacing * 3
-        start_x = config.WINDOW_WIDTH // 2 - total_width // 2
-        y = config.WINDOW_HEIGHT - 90
-
-        names = ["airstrike", "guided", "sonar", "napalm"]
-        self.ability_buttons = []
-        for idx, name in enumerate(names):
-            rect = pygame.Rect(start_x + idx * (size + spacing), y, size, size)
-            self.ability_buttons.append((name, rect))
 
     def _ability_display_name(self, ability_key):
         is_modern = theme_manager.current.name == "MODERN"

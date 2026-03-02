@@ -1,3 +1,4 @@
+# shared_placement.py
 """Gemeinsame Placement-Logik für Singleplayer und Multiplayer."""
 
 from pgzero.keyboard import keys
