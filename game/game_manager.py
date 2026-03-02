@@ -23,6 +23,7 @@ from game.states.multiplayer import MultiplayerState
 from game.states.create_game import CreateGameState
 from game.states.join_game import JoinGameState
 from game.states.multiplayer_placement import MultiplayerPlacementState
+from game.states.multiplayer_battle import MultiplayerBattleState
 
 
 class GameManager:
@@ -37,6 +38,7 @@ class GameManager:
         STATE_MULTIPLAYER_CREATE: CreateGameState,
         STATE_MULTIPLAYER_JOIN: JoinGameState,
         STATE_MULTIPLAYER_PLACEMENT: MultiplayerPlacementState,
+        STATE_MULTIPLAYER_GAME: MultiplayerBattleState,
 
 
     }
@@ -53,6 +55,8 @@ class GameManager:
         self.shots_hit = 0
         self.time_elapsed = 0.0
         self.ai_difficulty = "normal"
+
+
 
         # Initialer State
         self.change_state(STATE_MENU)

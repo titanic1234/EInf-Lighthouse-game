@@ -13,7 +13,7 @@ CHECK_CONNECTION_ACTIVE = False
 GAME_STATE = None
 
 
-
+HOST: bool | None
 CODE: str | None = None
 NAME: str | None = None
 PLAYER_TOKEN: str | None = None
@@ -27,8 +27,8 @@ WINNER: str | None = None
 
 
 
-def change_vars(code=None, name=None, player_token=None, role=None):
-    global CODE, NAME, PLAYER_TOKEN, ROLE
+def change_vars(code=None, name=None, player_token=None, role=None, host=None):
+    global CODE, NAME, PLAYER_TOKEN, ROLE, HOST
     if code is not None:
         CODE = code
     if name is not None:
@@ -37,7 +37,8 @@ def change_vars(code=None, name=None, player_token=None, role=None):
         PLAYER_TOKEN = player_token
     if role is not None:
         ROLE = role
-
+    if host is not None:
+        HOST = host
 
 def connection_status(status: bool):
     global CONNECTION
