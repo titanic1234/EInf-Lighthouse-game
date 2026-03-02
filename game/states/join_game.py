@@ -9,12 +9,16 @@ from game.states.base_state import BaseState
 
 import game.multiplayer.multiplayer_config as mconfig
 
+from game.multiplayer.ws import WSClient
+
 
 class JoinGameState(BaseState):
     """Multiplayer: Join Game Screen (Name + RoomCode + Join/Back)"""
 
     def __init__(self, game_manager):
         super().__init__(game_manager)
+
+        self.ws = WSClient()
 
         # ---- Field State ----
         self.name_text = mconfig.NAME if mconfig.NAME else ""
@@ -74,6 +78,8 @@ class JoinGameState(BaseState):
 
     def _start_game(self):
         mconfig.change_vars(name=self.name_text, code=self.room_text)
+        self.game_manager.change_state(config.STATE_MULTIPLAYER_PLACEMENT)
+        self.ws.start()
 
     # ---------------- Update / Input ----------------
     def update(self, dt, mouse_pos):

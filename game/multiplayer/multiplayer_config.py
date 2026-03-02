@@ -2,8 +2,8 @@
 Multiplayer Config
 """
 
-MULTIPLAYER_SERVER_URL = "http://127.0.0.1:8000/"
-MULTIPLAYER_WS_URL = "ws://127.0.0.1:8000/ws/"
+MULTIPLAYER_SERVER_URL = "http://46.224.135.187:8000/"
+MULTIPLAYER_WS_URL = "ws://46.224.135.187:8000/ws/"
 CONNECTION = False
 CHECK_CONNECTION_INTERVAL = 5
 CHECK_CONNECTION = True
@@ -46,3 +46,11 @@ def check_connection(status: bool = CHECK_CONNECTION, check: bool = CHECK_CONNEC
     CHECK_CONNECTION = status
     CHECK_CONNECTION_INTERVAL = interval
     CHECK_CONNECTION_ACTIVE = check
+
+
+def set_game(state: str = GAME_STATE, opponent_name: str | None = OPPONENT_NAME, ready: bool = READY, winner: str | None = WINNER):
+    global GAME_STATE, OPPONENT_NAME, READY, WINNER
+    GAME_STATE = state
+    OPPONENT_NAME = opponent_name
+    READY = ready
+    WINNER = winner

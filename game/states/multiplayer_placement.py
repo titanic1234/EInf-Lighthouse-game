@@ -47,10 +47,12 @@ class MultiplayerPlacementState(BaseState):
         self.local_ready_sent = False
         self.toast_text = ""
         self.toast_timer = 0.0
+        self.host = True if mconfig.ROLE == "host" else False
 
         # Buttons
         self.ready_button = self._build_ready_button()
-        self.start_button = self._build_start_button()
+        if self.host:
+            self.start_button = self._build_start_button()
 
     # ------------------------------
     # Ship / Placement helpers
@@ -190,10 +192,11 @@ class MultiplayerPlacementState(BaseState):
         pass
 
     def _on_ready_clicked(self):
+        print("READY CLICKED")
         if not self._all_ships_placed():
             self._show_toast("Platziere zuerst alle Schiffe!")
             return
-        if mconfig.CONNECTION is False:
+        if not mconfig.CONNECTION:
             self._show_toast("Keine Verbindung zum Server.")
             return
 
@@ -202,6 +205,7 @@ class MultiplayerPlacementState(BaseState):
         self._show_toast("Bereit gesendet. Warte auf Gegner...")
 
     def _on_start_clicked(self):
+        if not self.host: return
         if not self._can_start_game():
             self._show_toast("Spiel kann noch nicht starten.")
             return
@@ -241,7 +245,8 @@ class MultiplayerPlacementState(BaseState):
 
         # Buttons hover
         self.ready_button.update(dt, mouse_pos[0], mouse_pos[1])
-        self.start_button.update(dt, mouse_pos[0], mouse_pos[1])
+        if self.host:
+            self.start_button.update(dt, mouse_pos[0], mouse_pos[1])
 
     def on_mouse_down(self, pos, button):
         if button != 1:
@@ -280,12 +285,6 @@ class MultiplayerPlacementState(BaseState):
     def on_key_down(self, key, mod=0):
         if key == keys.R and self.selected_ship:
             self.current_orientation = (self.current_orientation + 1) % self.selected_ship.get_rotation_count()
-
-    def on_resize(self, width, height):
-        self.player_board.x_offset = config.PLAYER_GRID_X
-        self.player_board.y_offset = config.GRID_OFFSET_Y
-        self.ready_button = self._build_ready_button()
-        self.start_button = self._build_start_button()
 
     # ------------------------------
     # Draw
@@ -373,7 +372,7 @@ class MultiplayerPlacementState(BaseState):
         if self._can_send_ready():
             self.ready_button.draw(screen, default_color=(30, 110, 70), hover_color=(50, 170, 100))
 
-        if self.local_ready_sent and not self._can_start_game():
+        if self.local_ready_sent and not self._can_start_game() and self.host:
             # Wartetext statt Button
             draw_text(
                 screen,
@@ -385,7 +384,7 @@ class MultiplayerPlacementState(BaseState):
                 center=True,
             )
 
-        if self._can_start_game():
+        if self._can_start_game() and self.host:
             self.start_button.draw(screen, default_color=(30, 80, 140), hover_color=(60, 120, 220))
 
         # Toast

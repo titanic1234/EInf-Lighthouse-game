@@ -183,7 +183,7 @@ class MenuState(BaseState):
 
         # Untertitel
         sub_font = pygame.font.Font(None, config.MENU_SUBTITLE_FONT_SIZE)
-        sub_surf = sub_font.render(theme.text_subtitle, True, theme.color_text_secondary)
+        sub_surf = sub_font.render(current_theme.text_subtitle, True, current_theme.color_text_secondary)
         sub_rect = sub_surf.get_rect(center=(config.WINDOW_WIDTH // 2, config.MENU_SUBTITLE_Y))
         screen.blit(sub_surf, sub_rect)
 
