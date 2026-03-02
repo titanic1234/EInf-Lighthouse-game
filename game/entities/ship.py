@@ -2,7 +2,7 @@
 Ship-Klasse für Schiffe
 """
 
-from game.config import ORIENTATION_HORIZONTAL
+from game.config import ORIENTATION_COUNT
 
 
 class Ship:
@@ -18,7 +18,7 @@ class Ship:
         """
         self.name = name
         self.length = length
-        self.orientation = ORIENTATION_HORIZONTAL
+        self.orientation = 0
         self.shape = shape
         self.row = 0
         self.col = 0
@@ -26,25 +26,13 @@ class Ship:
         self.cells = []  # Liste der Zellen, die dieses Schiff belegt
 
     def place(self, row, col, orientation):
-        """
-        Platziert das Schiff an einer Position
-
-        Args:
-            row: Startzeile
-            col: Startspalte
-            orientation: ORIENTATION_HORIZONTAL oder ORIENTATION_VERTICAL
-        """
+        """Platziert das Schiff an einer Position"""
         self.row = row
         self.col = col
         self.orientation = orientation
 
     def add_cell(self, cell):
-        """
-        Fügt eine Zelle zu diesem Schiff hinzu
-
-        Args:
-            cell: Cell-Objekt
-        """
+        """Ordnet ein Feld diesem Schiff zu"""
         self.cells.append(cell)
 
     def hit(self):
@@ -81,10 +69,11 @@ class Ship:
         self.cells = []
         self.row = 0
         self.col = 0
-        self.orientation = ORIENTATION_HORIZONTAL
+        self.orientation = 0
 
     def __repr__(self):
-        orientation_str = "H" if self.orientation == ORIENTATION_HORIZONTAL else "V"
+        orientation_labels = ["0°", "90°", "180°", "270°"]
+        orientation_str = orientation_labels[self.orientation % ORIENTATION_COUNT]
         status = "VERSENKT" if self.is_destroyed() else f"{self.hits}/{self.get_size()}"
         return f"{self.name} [{orientation_str}] @ ({self.row},{self.col}) - {status}"
 
@@ -94,16 +83,10 @@ class Ship:
             return [(0, 0), (0, 1), (1, 0), (1, 1), (1, 2)]
         return [(0, i) for i in range(self.length)]
 
-    def get_rotation_count(self):
-        """Anzahl an unterschiedlichen Ausrichtungen je schiff form"""
-        if self.shape == "carrier_l":
-            return 4
-        return 2
-
     def _oriented_offsets(self, orientation):
         """Richtet Offsets gemäß Orientierung aus."""
         offsets = self._base_offsets()
-        rotation_steps = orientation % self.get_rotation_count()
+        rotation_steps = orientation % ORIENTATION_COUNT
 
         for _ in range(rotation_steps):
             # 90° Drehung im Uhrzeigersinn
