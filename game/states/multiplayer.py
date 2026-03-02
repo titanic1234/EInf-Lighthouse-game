@@ -9,7 +9,7 @@ import game.theme as theme
 
 from game.multiplayer.schemas import *
 
-from game.multiplayer.communication import create_game
+from game.multiplayer.communication import create_game as create_game_request
 
 
 
@@ -81,7 +81,7 @@ class MultiplayerState(BaseState):
         self.game_manager.change_state(config.STATE_MENU)
 
     def _create_game(self):
-        create_game()
+        create_game_request()
         self.game_manager.change_state(config.STATE_MULTIPLAYER_CREATE)
 
     def _join_game(self):

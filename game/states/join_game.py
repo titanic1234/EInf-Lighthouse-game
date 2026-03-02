@@ -9,7 +9,8 @@ from game.states.base_state import BaseState
 
 import game.multiplayer.multiplayer_config as mconfig
 
-from game.multiplayer.ws import WSClient
+
+from game.multiplayer.communication import join_game as join_game_request
 
 
 class JoinGameState(BaseState):
@@ -18,7 +19,6 @@ class JoinGameState(BaseState):
     def __init__(self, game_manager):
         super().__init__(game_manager)
 
-        self.ws = WSClient()
 
         # ---- Field State ----
         self.name_text = mconfig.NAME if mconfig.NAME else ""
@@ -45,6 +45,9 @@ class JoinGameState(BaseState):
         fields_top = ship_center_y + 150
         self.name_rect = pygame.Rect(center_x - self.field_w // 2, fields_top, self.field_w, self.field_h)
         self.room_rect = pygame.Rect(center_x - self.field_w // 2, fields_top + 120, self.field_w, self.field_h)
+
+        self.toast_text = ""
+        self.toast_timer = 0.0
 
         # Buttons
         self.buttons = []
@@ -73,13 +76,25 @@ class JoinGameState(BaseState):
 
         self.buttons = [self.btn_join, self.btn_back]
 
+
+    def _show_toast(self, text: str, duration: float = 2.0):
+        self.toast_text = text
+        self.toast_timer = duration
+
     def _back_menu(self):
         self.game_manager.change_state(config.STATE_MULTIPLAYER_MENU)
 
     def _start_game(self):
-        mconfig.change_vars(name=self.name_text, code=self.room_text)
-        self.game_manager.change_state(config.STATE_MULTIPLAYER_PLACEMENT)
-        self.ws.start()
+        fehler = join_game_request(code=self.room_text, name=self.name_text)
+        if not fehler:
+            self.game_manager.change_state(config.STATE_MULTIPLAYER_PLACEMENT)
+
+        else:
+            # TODO: Fehlermeldung anzeigen
+            text = f"Fehler beim Join: {fehler}"
+            self._show_toast(text)
+            #self.game_manager.change_state(config.STATE_MULTIPLAYER_MENU)
+
 
     # ---------------- Update / Input ----------------
     def update(self, dt, mouse_pos):

@@ -27,13 +27,16 @@ WINNER: str | None = None
 
 
 
-
-def change_vars(code: str | None = CODE, name: str | None = NAME, player_token: str | None = PLAYER_TOKEN, role: str | None = ROLE):
+def change_vars(code=None, name=None, player_token=None, role=None):
     global CODE, NAME, PLAYER_TOKEN, ROLE
-    CODE = code
-    NAME = name
-    PLAYER_TOKEN = player_token
-    ROLE = role
+    if code is not None:
+        CODE = code
+    if name is not None:
+        NAME = name
+    if player_token is not None:
+        PLAYER_TOKEN = player_token
+    if role is not None:
+        ROLE = role
 
 
 def connection_status(status: bool):
@@ -41,16 +44,23 @@ def connection_status(status: bool):
     CONNECTION = status
 
 
-def check_connection(status: bool = CHECK_CONNECTION, check: bool = CHECK_CONNECTION_ACTIVE, interval: int = CHECK_CONNECTION_INTERVAL):
+def check_connection(status=None, check=None, interval=None):
     global CHECK_CONNECTION, CHECK_CONNECTION_INTERVAL, CHECK_CONNECTION_ACTIVE
-    CHECK_CONNECTION = status
-    CHECK_CONNECTION_INTERVAL = interval
-    CHECK_CONNECTION_ACTIVE = check
+    if status is not None:
+        CHECK_CONNECTION = status
+    if interval is not None:
+        CHECK_CONNECTION_INTERVAL = interval
+    if check is not None:
+        CHECK_CONNECTION_ACTIVE = check
 
 
-def set_game(state: str = GAME_STATE, opponent_name: str | None = OPPONENT_NAME, ready: bool = READY, winner: str | None = WINNER):
+def set_game(state=None, opponent_name=None, ready=None, winner=None):
     global GAME_STATE, OPPONENT_NAME, READY, WINNER
-    GAME_STATE = state
-    OPPONENT_NAME = opponent_name
-    READY = ready
-    WINNER = winner
+    if state is not None:
+        GAME_STATE = state
+    if opponent_name is not None:
+        OPPONENT_NAME = opponent_name
+    if ready is not None:
+        READY = ready
+    if winner is not None:
+        WINNER = winner

@@ -11,20 +11,12 @@ from game.graphics import draw_gradient_background, GlowButton, draw_title_art
 from game.states.base_state import BaseState
 
 import game.multiplayer.multiplayer_config as mconfig
-from game.multiplayer.ws import WSClient
-
-from game.multiplayer.communication import create_game as create_game_request
-from game.multiplayer.schemas import CreateGame as CreateGameSchema
-
 
 class CreateGameState(BaseState):
     """Multiplayer: Create Game Screen (Name + RoomCode + Start/Back)"""
 
     def __init__(self, game_manager):
         super().__init__(game_manager)
-
-
-        self.ws = WSClient()
 
         # ---- Field State ----
         self.name_text = mconfig.NAME if mconfig.NAME else ""
@@ -98,7 +90,6 @@ class CreateGameState(BaseState):
     def _start_game(self):
         mconfig.change_vars(name=self.name_text)
         self.game_manager.change_state(config.STATE_MULTIPLAYER_PLACEMENT)
-        self.ws.start()
 
 
     # ---------- Copy / Toast ----------

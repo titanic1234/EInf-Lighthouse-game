@@ -4,6 +4,7 @@ Spieler platziert seine Schiffe, wartet auf Gegner, Ready/Start Logik
 """
 
 from pgzero.keyboard import keys
+from pyexpat.errors import messages
 from pygame import Rect
 
 import game.config as config
@@ -21,6 +22,7 @@ from game.theme import theme_manager
 from game.states.base_state import BaseState
 
 import game.multiplayer.multiplayer_config as mconfig
+from game.multiplayer.ws import WSClient
 
 
 class MultiplayerPlacementState(BaseState):
@@ -28,6 +30,10 @@ class MultiplayerPlacementState(BaseState):
 
     def __init__(self, game_manager):
         super().__init__(game_manager)
+
+        self.ws = WSClient()
+        self.ws.start()
+        print("start")
 
         self.player_board = Board(config.PLAYER_GRID_X, config.GRID_OFFSET_Y, "Player")
 
@@ -168,7 +174,13 @@ class MultiplayerPlacementState(BaseState):
 
     def _can_start_game(self):
         # „bereit“ nur wenn Gegner da + server sagt READY True (oder du setzt READY wenn beide ready)
-        return self._all_ships_placed() and (mconfig.OPPONENT_NAME is not None) and (mconfig.READY is True)
+
+        return (
+                self._all_ships_placed()
+                and self.host
+                and (mconfig.OPPONENT_NAME is not None)
+                and (mconfig.READY is True)
+        )
 
     def _show_toast(self, text: str, duration: float = 2.0):
         self.toast_text = text
@@ -183,7 +195,9 @@ class MultiplayerPlacementState(BaseState):
         # Placeholder: du könntest hier mconfig.READY nicht setzen, weil server das tun soll.
         # Aber für Offline-Test:
         # mconfig.READY = True
-        pass
+
+        message = {"type": "ready"}
+        self.ws.send_json(message)
 
     def _request_start_to_server(self):
         """
@@ -217,12 +231,30 @@ class MultiplayerPlacementState(BaseState):
         self.game_manager.player_board = self.player_board
         self.game_manager.change_state(config.STATE_MULTIPLAYER_GAME)
 
+    def _process_ws_messages(self):
+        while True:
+            msg = self.ws.poll()
+            if msg is None:
+                break
+
+            # Debug:
+            print("WS IN:", msg)
+
+            if msg.get("type") == "ready":
+                ready = bool(msg.get("guest_ready")) and bool(msg.get("host_ready"))
+                mconfig.set_game(opponent_name=msg.get("opponent_name"), ready=ready)
+
+            elif msg.get("type") == "opponent_joined":
+                mconfig.set_game(opponent_name=msg.get("opponent_name"), ready=False)
+
+
     # ------------------------------
     # Update / Input
     # ------------------------------
     def update(self, dt, mouse_pos):
         self.player_board.all_ships_placed = self._all_ships_placed()
         self.mouse_pos = mouse_pos
+        self._process_ws_messages()
 
         if self.toast_timer > 0:
             self.toast_timer -= dt

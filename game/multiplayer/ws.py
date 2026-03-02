@@ -20,6 +20,8 @@ class WSClient:
 
     def __init__(self, reconnect: bool = True, reconnect_delay_s: float = 1.0):
         self.url = f"{mconfig.MULTIPLAYER_WS_URL}{mconfig.CODE}?token={mconfig.PLAYER_TOKEN}"
+        print(f"Connecting to {self.url}")
+
         self.reconnect = reconnect
         self.reconnect_delay_s = reconnect_delay_s
 
@@ -38,7 +40,7 @@ class WSClient:
         if self._started:
             return
         self._started = True
-        mconfig.check_connection(check=False)
+        mconfig.check_connection(status=False)
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
@@ -51,7 +53,7 @@ class WSClient:
         except Exception:
             pass
 
-        mconfig.check_connection(check=True)
+        mconfig.check_connection(status=True)
 
     def is_connected(self) -> bool:
         return self._connected
@@ -76,6 +78,13 @@ class WSClient:
 
     # ---------------- internal ----------------
 
+    def _build_url(self):
+        code = mconfig.CODE
+        token = mconfig.PLAYER_TOKEN
+        if not code or not token:
+            return None
+        return f"{mconfig.MULTIPLAYER_WS_URL}{code}?token={token}"
+
     def _set_connected(self, value: bool):
         self._connected = value
         # Queue maxsize=1: immer nur neuesten Status behalten
@@ -88,22 +97,27 @@ class WSClient:
 
     def _drain_outgoing(self):
         """Sendet alle queued Messages (läuft im WS-Thread)."""
+
         if not self._ws:
             return
         while True:
             try:
                 raw = self._outgoing.get_nowait()
-            except Empty:
+                print("Senden: ", raw, end="")
+            except Empty as error:
                 break
             try:
                 self._ws.send(raw)
-            except Exception:
+                print("Gesendet: ", raw, end="")
+            except Exception as error:
+                print(f"Fehler beim Senden: {error}")
                 # wenn senden fehlschlägt, abbrechen (disconnect handled elsewhere)
                 break
 
     def _run(self):
         while not self._stop:
             try:
+
                 self._ws = websocket.create_connection(self.url, timeout=2.0)
                 self._ws.settimeout(0.2)  # kurzer recv timeout, damit wir outgoing oft flushen
                 self._set_connected(True)
