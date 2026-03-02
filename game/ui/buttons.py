@@ -1,10 +1,7 @@
-"""
-Button-Klassen.
-"""
+"""Button-Klassen."""
 
-import pygame
-from pygame import Rect
-from game.config import COLOR_WHITE, BUTTON_COLOR, BUTTON_HOVER_COLOR
+from pgzero.rect import Rect
+from game.config import BUTTON_COLOR, BUTTON_HOVER_COLOR, COLOR_WHITE
 
 
 class BaseButton:
@@ -13,7 +10,7 @@ class BaseButton:
     def __init__(self, x, y, width, height, text, action):
         self.x = x
         self.y = y
-        self.rect = pygame.Rect(x - width // 2, y - height // 2, width, height)
+        self.rect = Rect(x - width // 2, y - height // 2, width, height)
         self.text = text
         self.action = action
         self.hovered = False
