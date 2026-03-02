@@ -50,6 +50,10 @@ class MultiplayerLobbyState(BaseState):
         self.buttons = []
         self.text_fields = []
 
+
+    # ------------------------------
+    # Button create
+    # ------------------------------
     def _create_game_buttons(self, text):
         center_x = config.WINDOW_WIDTH // 2
         start_y = config.MENU_BUTTON_Y
@@ -73,6 +77,10 @@ class MultiplayerLobbyState(BaseState):
             ),
         ]
 
+
+    # ------------------------------
+    # Button clicked
+    # ------------------------------
     def _start_game(self):
         """Hook for subclasses."""
 
@@ -80,6 +88,9 @@ class MultiplayerLobbyState(BaseState):
         self.game_manager.change_state(config.STATE_MULTIPLAYER_MENU)
 
 
+    # ------------------------------
+    # Events
+    # ------------------------------
     def on_mouse_down(self, pos, button):
         if button != 1:
             return
@@ -141,8 +152,6 @@ class MultiplayerLobbyState(BaseState):
             self._copy_room_code()
             return
 
-
-
         # -------- Texteingabe über KEYDOWN (funktioniert immer) --------
         mods = mod
         if mods & (keymods.ALT | keymods.META):
@@ -190,8 +199,6 @@ class MultiplayerLobbyState(BaseState):
                 self.room_text += chr(key)
                 return
 
-
-
     def on_text_input(self, text: str):
         """Optional: falls dein GameManager pygame.TEXTINPUT weiterreicht (z.B. für Umlaute)."""
         if not text:
@@ -209,7 +216,10 @@ class MultiplayerLobbyState(BaseState):
             if ch.isdigit() and len(self.room_text) < self.room_max_len:
                 self.room_text += ch
 
-    # ---------------- Drawing ----------------
+
+    # ------------------------------
+    # Draw
+    # ------------------------------
     def _draw_textbox(self, screen, rect, value, placeholder, focused, locked=False):
         # Farben aus config (optional erweiterbar)
         bg = getattr(config, "COLOR_INPUT_BG", (15, 25, 45))
@@ -239,9 +249,6 @@ class MultiplayerLobbyState(BaseState):
         if focused and (not locked) and (int(self.cursor_t * 2) % 2 == 0):
             cx = rect.x + 16 + min(rect.w - 32, 12 * len(value))
             pygame.draw.line(screen, text_col, (cx, rect.y + 10), (cx, rect.bottom - 10), 2)
-
-
-
 
     def draw(self, screen):
         draw_gradient_background(screen, time_value=self.game_manager.time_elapsed)
