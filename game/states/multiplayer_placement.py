@@ -143,7 +143,8 @@ class MultiplayerPlacementState(SharedPlacementState):
                 self._show_toast(msg.get("detail", "Server error"))
 
     def _handle_action_button_click(self, pos):
-        self.ready_button.click()
+        if self.ready_button.is_hovered(pos[0], pos[1]):
+            self.ready_button.click()
     # ------------------------------
     # Update / Input
     # ------------------------------
