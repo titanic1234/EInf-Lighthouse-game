@@ -8,7 +8,6 @@ from game.multiplayer.ws import WSClient
 from game.graphics import draw_rounded_rect, draw_text
 from game.states.shared_placement import SharedPlacementState
 from game.theme import theme_manager
-from game.graphics import GlowButton
 
 
 class MultiplayerPlacementState(SharedPlacementState):
@@ -40,7 +39,7 @@ class MultiplayerPlacementState(SharedPlacementState):
 
 
     # ------------------------------
-    # Multiplayer: Board Upload + Ready
+    # Button clicked
     # ------------------------------
     def _send_board_to_server_once(self):
         """
@@ -62,18 +61,6 @@ class MultiplayerPlacementState(SharedPlacementState):
     def _can_send_ready(self):
         return self._all_ships_placed() and (not self.local_ready_sent)
 
-    def _can_start_game(self):
-        return (
-            self._all_ships_placed()
-            and self.host
-            and (mconfig.OPPONENT_NAME is not None)
-            and (mconfig.READY is True)
-        )
-
-    def _show_toast(self, text: str, duration: float = 2.0):
-        self.toast_text = text
-        self.toast_timer = duration
-
     def _send_ready_to_server(self):
         self.ws.send_json({"type": "ready"})
 
@@ -93,14 +80,22 @@ class MultiplayerPlacementState(SharedPlacementState):
         self._send_ready_to_server()
         self._show_toast("Bereit gesendet. Warte auf Gegner...")
 
-    def _on_start_clicked(self):
-        # Server startet automatisch sobald beide ready und boards gesetzt sind.
-        if not self.host:
-            return
-        if not self._can_start_game():
-            self._show_toast("Spiel kann noch nicht starten.")
-            return
+    def _handle_action_button_click(self, pos):
+        if self.ready_button.is_hovered(pos[0], pos[1]):
+            self.ready_button.click()
 
+
+    # ------------------------------
+    # Graphics
+    # ------------------------------
+    def _show_toast(self, text: str, duration: float = 2.0):
+        self.toast_text = text
+        self.toast_timer = duration
+
+
+    # ------------------------------
+    # websocket
+    # ------------------------------
     def _process_ws_messages(self):
         while True:
             msg = self.ws.poll()
@@ -108,8 +103,6 @@ class MultiplayerPlacementState(SharedPlacementState):
                 break
 
             t = msg.get("type")
-            # Debug:
-            # print("WS IN:", msg)
 
             if t == "presence":
                 # Gegnername aus host_name/guest_name
@@ -142,11 +135,9 @@ class MultiplayerPlacementState(SharedPlacementState):
             elif t == "error":
                 self._show_toast(msg.get("detail", "Server error"))
 
-    def _handle_action_button_click(self, pos):
-        if self.ready_button.is_hovered(pos[0], pos[1]):
-            self.ready_button.click()
+
     # ------------------------------
-    # Update / Input
+    # Update
     # ------------------------------
     def update(self, dt, mouse_pos):
         self._process_ws_messages()
@@ -156,10 +147,10 @@ class MultiplayerPlacementState(SharedPlacementState):
                 self.toast_text = ""
         super().update(dt, mouse_pos)
 
+
     # ------------------------------
     # Draw
     # ------------------------------
-
     def draw(self, screen):
         super().draw(screen)
         if self.toast_text:
@@ -167,7 +158,6 @@ class MultiplayerPlacementState(SharedPlacementState):
 
     def _draw_status_panels(self, screen):
         self._draw_multiplayer_status(screen)
-
 
     def _draw_action_buttons(self, screen):
         if self._can_send_ready():
@@ -199,4 +189,3 @@ class MultiplayerPlacementState(SharedPlacementState):
         draw_text(screen, f"BOARD GESENDET: {board_sent}", status_rect.x + 20, y, 26, theme.color_text_secondary); y += line_h
         draw_text(screen, f"DU BEREIT: {local_ready}", status_rect.x + 20, y, 26, theme.color_text_secondary); y += line_h
         draw_text(screen, f"SPIEL STARTBAR: {server_ready}", status_rect.x + 20, y, 26, theme.color_text_secondary)
-
