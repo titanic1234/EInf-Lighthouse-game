@@ -5,9 +5,6 @@ from pgzero.keyboard import keys
 from pgzero.builtins import keymods
 
 import game.config as config
-from game.graphics import draw_gradient_background, GlowButton, draw_title_art
-from game.states.base_state import BaseState
-
 import game.multiplayer.multiplayer_config as mconfig
 
 from game.states.multiplayer_lobby import MultiplayerLobbyState
@@ -20,7 +17,6 @@ class CreateGameState(MultiplayerLobbyState):
 
         # ---- Field State ----
         self.room_locked = True  # gesperrt: nicht editierbar/fokussierbar, aber kopierbar
-
 
         # ---- Clipboard / Toast ----
         self.clipboard_ok = True
@@ -37,14 +33,17 @@ class CreateGameState(MultiplayerLobbyState):
         self._create_game_buttons(text=self.text)
 
 
-
-
+    # ------------------------------
+    # Button clicked
+    # ------------------------------
     def _start_game(self):
         mconfig.change_vars(name=self.name_text)
         self.game_manager.change_state(config.STATE_MULTIPLAYER_PLACEMENT)
 
 
-    # ---------- Copy / Toast ----------
+    # ------------------------------
+    # Copy / Toast
+    # ------------------------------
     def _show_copy_toast(self, text: str, duration: float = 2.0):
         self.toast_text = text
         self.toast_timer = duration
@@ -66,7 +65,10 @@ class CreateGameState(MultiplayerLobbyState):
         except Exception:
             self._show_copy_toast("Kopieren fehlgeschlagen")
 
-    # ---------------- Update / Input ----------------
+
+    # ------------------------------
+    # Update
+    # ------------------------------
     def update(self, dt, mouse_pos):
         self.cursor_t += dt
         if self.toast_timer > 0:
@@ -87,15 +89,11 @@ class CreateGameState(MultiplayerLobbyState):
             self.text_fields[1].text = self.room_text
 
 
-
-
-
-
-    # ---------------- Drawing ----------------
-
+    # ------------------------------
+    # Draw
+    # ------------------------------
     def draw(self, screen):
         super().draw(screen)
-
 
         # Toast (kurzes Feedback)
         if self.toast_text:
@@ -113,4 +111,3 @@ class CreateGameState(MultiplayerLobbyState):
             pygame.draw.rect(screen, (10, 16, 28), bg_rect, border_radius=12)
             pygame.draw.rect(screen, config.COLOR_BLUE, bg_rect, width=2, border_radius=12)
             screen.blit(toast, toast_rect)
-

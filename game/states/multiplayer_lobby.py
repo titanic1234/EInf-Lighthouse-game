@@ -11,8 +11,6 @@ from game.graphics import draw_gradient_background, GlowButton, draw_title_art
 
 from game.states.base_state import BaseState
 
-from game.multiplayer.communication import join_game as join_game_request
-
 
 class MultiplayerLobbyState(BaseState):
     """Multiplayer: Lobby"""
