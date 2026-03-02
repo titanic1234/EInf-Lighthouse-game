@@ -35,7 +35,3 @@ class PlacementState(SharedPlacementState):
     def _draw_action_buttons(self, screen):
         if self._all_ships_placed():
             self.start_button.draw(screen, default_color=(30, 110, 70), hover_color=(50, 170, 100))
-
-    def on_resize(self, width, height):
-        super().on_resize(width, height)
-        self.start_button = self.build_primary_action_button("GEFECHT STARTEN", self._start_battle, y_offset=30)

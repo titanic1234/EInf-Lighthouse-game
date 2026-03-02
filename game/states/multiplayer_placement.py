@@ -167,7 +167,7 @@ class MultiplayerPlacementState(SharedPlacementState):
     def _draw_multiplayer_status(self, screen):
         theme = theme_manager.current
 
-        status_rect = Rect(40, 40, 520, 190)
+        status_rect = Rect(1300, 240, 520, 220)
         draw_rounded_rect(screen, (0, 0, 0), status_rect, radius=16, alpha=160)
         draw_rounded_rect(screen, theme.color_ship_border, status_rect, radius=16, width=2, alpha=100)
 
@@ -180,7 +180,6 @@ class MultiplayerPlacementState(SharedPlacementState):
         conn = "ONLINE" if self.ws.is_connected() else "OFFLINE"
 
         local_ready = "JA" if self.local_ready_sent else "NEIN"
-        server_ready = "JA" if mconfig.READY else "NEIN"
         board_sent = "JA" if self.board_sent else "NEIN"
 
         draw_text(screen, f"ROOM: {code}", status_rect.x + 20, y, 26, theme.color_text_primary); y += line_h
@@ -189,4 +188,3 @@ class MultiplayerPlacementState(SharedPlacementState):
         draw_text(screen, f"STATUS: {conn}", status_rect.x + 20, y, 26, theme.color_text_secondary); y += line_h
         draw_text(screen, f"BOARD GESENDET: {board_sent}", status_rect.x + 20, y, 26, theme.color_text_secondary); y += line_h
         draw_text(screen, f"DU BEREIT: {local_ready}", status_rect.x + 20, y, 26, theme.color_text_secondary); y += line_h
-        draw_text(screen, f"SPIEL STARTBAR: {server_ready}", status_rect.x + 20, y, 26, theme.color_text_secondary)

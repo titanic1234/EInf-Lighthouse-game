@@ -324,10 +324,6 @@ class SharedPlacementState(BaseState):
         draw_rounded_rect(screen, theme.color_ship_border, toast_rect, radius=16, width=2, alpha=120)
         draw_text(screen, text, toast_rect.centerx, toast_rect.centery, 30, theme.color_text_primary, center=True)
 
-    def on_resize(self, width, height):
-        self.player_board.x_offset = config.PLAYER_GRID_X
-        self.player_board.y_offset = config.GRID_OFFSET_Y
-
     @staticmethod
     def build_primary_action_button(text, action, y_offset):
         return GlowButton(
