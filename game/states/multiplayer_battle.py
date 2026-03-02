@@ -157,6 +157,23 @@ class MultiplayerBattleState(SharedBattleState):
         if isinstance(next_turn, str) and next_turn in ("host", "guest"):
             self._set_turn(next_turn)
 
+        fire_started = bool(msg.get("fire_started"))
+        origin = msg.get("fire_origin")
+
+        if fire_started and isinstance(origin, dict):
+            r0 = origin.get("row")
+            c0 = origin.get("col")
+            target_role = origin.get("target_role")
+            if isinstance(r0, int) and isinstance(c0, int):
+                if target_role != self.role:
+                    cell = self.opponent_board.get_cell(r0, c0)
+                    if cell:
+                        cell.napalm_marked = True
+                else:
+                    cell = self.player_board.get_cell(r0, c0)
+                    if cell:
+                        cell.napalm_marked = True
+
     def _apply_sonar_result(self, msg: dict):
         # {"type":"sonar_result","cells":[[r,c],...],"found":[[r,c],...]}
         cells = msg.get("cells", [])
@@ -180,6 +197,55 @@ class MultiplayerBattleState(SharedBattleState):
 
         self.message = "SONAR COMPLETE"
 
+    def _apply_fire_tick(self, msg: dict):
+        """
+        Server:
+          {"type":"fire_tick","results":[{"target_role":"guest","row":..,"col":..,"hit":..,"destroyed":..,"destroyed_cells":[...]}]}
+        """
+        results = msg.get("results", [])
+        if not isinstance(results, list):
+            return
+
+        # optional: message setzen
+        self.message = "FIRE SPREADING..."
+
+        for r in results:
+            if not isinstance(r, dict):
+                continue
+
+            target_role = r.get("target_role")  # "host" oder "guest"
+            row = r.get("row")
+            col = r.get("col")
+            hit = bool(r.get("hit"))
+            destroyed = bool(r.get("destroyed"))
+            destroyed_cells = r.get("destroyed_cells", [])
+
+            if not isinstance(row, int) or not isinstance(col, int):
+                continue
+
+            # Wenn das Feuer den Gegner trifft, ist target_role der Gegner.
+            # Aus Sicht dieses Clients:
+            # - wenn target_role != self.role -> Feuer trifft Gegnerboard (fog board)
+            # - wenn target_role == self.role -> Feuer trifft dein eigenes echtes Board
+            if target_role != self.role:
+                self._mark_opponent_cell(row, col, hit)
+                # optional: Napalm-Markierung (damit man "brennende" Zellen erkennt)
+                cell = self.opponent_board.get_cell(row, col)
+                if cell and not cell.is_shot():
+                    cell.napalm_marked = True
+                self._spawn_effects(self.opponent_board, row, col, hit)
+
+                if destroyed:
+                    self._apply_destroyed_cells_on_opponent(destroyed_cells)
+            else:
+                # Feuer trifft dich -> echtes Board schießen
+                hit2, destroyed2, ship = self.player_board.shoot(row, col)
+                # napalm marker auf playerboard:
+                cell = self.player_board.get_cell(row, col)
+                if cell and not cell.is_shot():
+                    cell.napalm_marked = True
+                self._spawn_effects(self.player_board, row, col, hit2)
+
     def _process_ws_messages(self):
         while True:
             msg = self.ws.poll()
@@ -202,6 +268,9 @@ class MultiplayerBattleState(SharedBattleState):
 
             elif t == "sonar_result":
                 self._apply_sonar_result(msg)
+
+            elif t == "fire_tick":
+                self._apply_fire_tick(msg)
 
             elif t == "turn_update":
                 turn = msg.get("turn")
