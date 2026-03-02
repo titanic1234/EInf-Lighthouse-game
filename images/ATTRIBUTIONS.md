@@ -1,0 +1,9 @@
+## Image Credits
+
+| Source                                                                         | Images                                                                                                                                                                                            |
+|--------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Unlicensed pngs                                                                | airstrike.png, breitseite.png, enterhaken.png griechisches_feuer.png, Kraehennest.png lenkrakete.png, napalm.png, sonar.png, ui_modern_title_art.png                                              |
+| AI Vektorgraphik to png                                                        | ui_generic_destroyed.png, ui_generic_hit.png, ui_generic_miss.png, ui_generic_player_marker.png, ui_generic_scan.png, ui_generic_scan_found.png, ui_modern_ship_cell.png, ui_pirate_ship_cell.png |
+| AI text to image                                                               | ui_pirate_title_art.png, Schlachtschiff(5x1).png, Kreuzer(4x1).png, Zerstoerer(3x1).png, U-Boot(2x1).png, Flugzeugträger(3x2).png                                                                 |
+| [You're Perfect Studio](https://opengameart.org/users/youre-perfect-studio)    | ui_modern_water.png, ui_pirate_water.png                                                                                                                                                          |
+| [Bloob.io](https://bloob.io/battleship) (Dev Erlaubnis) <br/>in Gimp angepasst | Flaggschiff(5x1).png, Galeone(4x1).png, Fregatte(3x1).png, Schaluppe(2x1).png, Moerser_Brigg(3x2).png                                                                                             |
