@@ -2,7 +2,7 @@
 Board-Klasse für das Spielfeld
 """
 
-from game.config import GRID_SIZE, CELL_SIZE, SHIP_TYPES
+from game.config import GRID_SIZE, CELL_SIZE, SHIP_TYPES, ORIENTATION_COUNT
 from game.entities.cell import Cell
 from game.entities.ship import Ship
 import random
@@ -45,15 +45,6 @@ class Board:
     def can_place_ship(self, ship, row, col, orientation):
         """
         Prüft, ob ein Schiff platziert werden kann
-
-        Args:
-            ship: Ship-Objekt
-            row: Startzeile
-            col: Startspalte
-            orientation: ORIENTATION_HORIZONTAL oder ORIENTATION_VERTICAL
-
-        Returns:
-            bool: True wenn platzierbar, sonst False
         """
         coordinates = ship.get_coordinates(row, col, orientation)
 
@@ -76,15 +67,6 @@ class Board:
     def place_ship(self, ship, row, col, orientation):
         """
         Platziert ein Schiff auf dem Board
-
-        Args:
-            ship: Ship-Objekt
-            row: Startzeile
-            col: Startspalte
-            orientation: ORIENTATION_HORIZONTAL oder ORIENTATION_VERTICAL
-
-        Returns:
-            bool: True wenn erfolgreich platziert, sonst False
         """
         if not self.can_place_ship(ship, row, col, orientation):
             return False
@@ -128,7 +110,7 @@ class Board:
                     row = random.randint(0, GRID_SIZE - 1)
                     col = random.randint(0, GRID_SIZE - 1)
                     ship = Ship(ship_name, ship_length, shape=ship_shape)
-                    orientation = random.randint(0, ship.get_rotation_count() - 1)
+                    orientation = random.randint(0, ORIENTATION_COUNT - 1)
 
                     if self.place_ship(ship, row, col, orientation):
                         placed = True

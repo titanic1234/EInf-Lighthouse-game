@@ -201,7 +201,7 @@ def _get_transformed_ship_surface(ship, grid_width, grid_height, orientation, sh
     if source_image is None:
         return None
 
-    orientation_steps = orientation % ship.get_rotation_count()
+    orientation_steps = orientation % config.ORIENTATION_COUNT
     render_key = (
         theme_manager.current.name,
         ship.name,

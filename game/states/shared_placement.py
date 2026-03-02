@@ -31,7 +31,7 @@ class SharedPlacementState(BaseState):
         self._create_ships()
 
         self.selected_ship = None
-        self.current_orientation = config.ORIENTATION_HORIZONTAL
+        self.current_orientation = 0
         self.preview_position = None
         self.placement_valid = False
         self.ship_list_item_rects = []
@@ -166,7 +166,7 @@ class SharedPlacementState(BaseState):
 
     def on_key_down(self, key, mod=0):
         if key == keys.R and self.selected_ship:
-            self.current_orientation = (self.current_orientation + 1) % self.selected_ship.get_rotation_count()
+            self.current_orientation = (self.current_orientation + 1) % config.ORIENTATION_COUNT
 
     def draw(self, screen):
         theme = theme_manager.current
