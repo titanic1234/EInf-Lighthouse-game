@@ -4,7 +4,6 @@ Spieler platziert seine Schiffe, wartet auf Gegner, Ready/Start Logik
 """
 
 from pgzero.keyboard import keys
-from pyexpat.errors import messages
 from pygame import Rect
 
 import game.config as config
@@ -31,10 +30,10 @@ class MultiplayerPlacementState(BaseState):
     def __init__(self, game_manager):
         super().__init__(game_manager)
 
-        self.game_manager.ws = WSClient()
-        self.game_manager.ws.start()
-        self.ws = self.game_manager.ws
-        print("start")
+        # WS starten und im GameManager speichern (Battle nutzt denselben Client)
+        self.ws = WSClient()
+        self.ws.start()
+        self.game_manager.ws = self.ws
 
         self.player_board = Board(config.PLAYER_GRID_X, config.GRID_OFFSET_Y, "Player")
 
@@ -54,10 +53,14 @@ class MultiplayerPlacementState(BaseState):
         self.local_ready_sent = False
         self.toast_text = ""
         self.toast_timer = 0.0
-        self.host = True if mconfig.ROLE == "host" else False
+        self.host = (mconfig.ROLE == "host")
+
+        # Board-Upload state
+        self.board_sent = False  # set_board schon gesendet?
 
         # Buttons
         self.ready_button = self._build_ready_button()
+        # optional (Server startet automatisch bei beiden ready; Button bleibt als UI)
         self.start_button = self._build_start_button()
 
     # ------------------------------
@@ -107,7 +110,9 @@ class MultiplayerPlacementState(BaseState):
             x, y, _, _ = self._get_preview_bounds(self.selected_ship, row, col, self.current_orientation)
             ship_coords = self.selected_ship.get_coordinates_at(row, col, self.current_orientation)
         else:
-            min_row, min_col, max_row, max_col = self._get_ship_bounds(self.selected_ship, 0, 0, self.current_orientation)
+            min_row, min_col, max_row, max_col = self._get_ship_bounds(
+                self.selected_ship, 0, 0, self.current_orientation
+            )
             grid_width = max_col - min_col + 1
             grid_height = max_row - min_row + 1
             width = grid_width * config.CELL_SIZE
@@ -147,6 +152,26 @@ class MultiplayerPlacementState(BaseState):
         return True
 
     # ------------------------------
+    # Multiplayer: Board Upload + Ready
+    # ------------------------------
+    def _send_board_to_server_once(self):
+        """
+        Sendet die eigenen Schiffszellen an den Server:
+        {"type":"set_board","ships":[ [[row,col],...], ... ]}
+        """
+        if self.board_sent:
+            return
+        if not self._all_ships_placed():
+            return
+
+        ships_payload = []
+        for ship in self.player_board.ships:
+            ships_payload.append([[cell.row, cell.col] for cell in ship.cells])
+
+        self.ws.send_json({"type": "set_board", "ships": ships_payload})
+        self.board_sent = True
+
+    # ------------------------------
     # Multiplayer UI logic
     # ------------------------------
     def _build_ready_button(self):
@@ -173,13 +198,11 @@ class MultiplayerPlacementState(BaseState):
         return self._all_ships_placed() and (not self.local_ready_sent)
 
     def _can_start_game(self):
-        # „bereit“ nur wenn Gegner da + server sagt READY True (oder du setzt READY wenn beide ready)
-
         return (
-                self._all_ships_placed()
-                and self.host
-                and (mconfig.OPPONENT_NAME is not None)
-                and (mconfig.READY is True)
+            self._all_ships_placed()
+            and self.host
+            and (mconfig.OPPONENT_NAME is not None)
+            and (mconfig.READY is True)
         )
 
     def _show_toast(self, text: str, duration: float = 2.0):
@@ -187,49 +210,31 @@ class MultiplayerPlacementState(BaseState):
         self.toast_timer = duration
 
     def _send_ready_to_server(self):
-        """
-        TODO: Hier deinen echten Request einbauen:
-        - z.B. websocket send: {"type":"ready", "token":..., "code":...}
-        - oder HTTP: POST /ready
-        """
-        # Placeholder: du könntest hier mconfig.READY nicht setzen, weil server das tun soll.
-        # Aber für Offline-Test:
-        # mconfig.READY = True
-
-        message = {"type": "ready"}
-        self.ws.send_json(message)
-
-    def _request_start_to_server(self):
-        """
-        TODO: Hier deinen Start-Request einbauen (server startet game, setzt GAME_STATE etc.)
-        """
-        pass
+        self.ws.send_json({"type": "ready"})
 
     def _on_ready_clicked(self):
         print("READY CLICKED")
         if not self._all_ships_placed():
             self._show_toast("Platziere zuerst alle Schiffe!")
             return
-        if not mconfig.CONNECTION:
+        if not self.ws.is_connected():
             self._show_toast("Keine Verbindung zum Server.")
             return
+
+        # ✅ wichtig: erst Board senden, dann ready
+        self._send_board_to_server_once()
 
         self.local_ready_sent = True
         self._send_ready_to_server()
         self._show_toast("Bereit gesendet. Warte auf Gegner...")
 
     def _on_start_clicked(self):
-        if not self.host: return
+        # Server startet automatisch sobald beide ready und boards gesetzt sind.
+        if not self.host:
+            return
         if not self._can_start_game():
             self._show_toast("Spiel kann noch nicht starten.")
             return
-
-        self._request_start_to_server()
-
-        # Wenn dein Server z.B. mconfig.GAME_STATE setzt, kannst du im update darauf reagieren.
-        # Für jetzt: Wechsel direkt in Multiplayer-Game-State:
-        self.game_manager.player_board = self.player_board
-        self.game_manager.change_state(config.STATE_MULTIPLAYER_GAME)
 
     def _process_ws_messages(self):
         while True:
@@ -237,24 +242,40 @@ class MultiplayerPlacementState(BaseState):
             if msg is None:
                 break
 
+            t = msg.get("type")
             # Debug:
-            print("WS IN:", msg)
+            # print("WS IN:", msg)
 
-            if msg.get("type") == "ready_update":
+            if t == "presence":
+                # Gegnername aus host_name/guest_name
+                opponent = (msg.get("guest_name") if self.host else msg.get("host_name")) or None
+                if opponent:
+                    mconfig.set_game(opponent_name=opponent)
+
+            elif t == "board_set":
+                # optional feedback
+                # msg: {"type":"board_set","role":"host/guest","host_board_set":bool,"guest_board_set":bool}
+                pass
+
+            elif t == "ready_update":
                 ready = bool(msg.get("guest_ready")) and bool(msg.get("host_ready"))
-                mconfig.set_game(opponent_name=msg.get("opponent_name"), ready=ready)
+                opponent = (msg.get("guest_name") if self.host else msg.get("host_name")) or None
+                mconfig.set_game(opponent_name=opponent, ready=ready)
 
-            elif msg.get("type") == "presence":
-                if mconfig.OPPONENT_NAME is None:
-                    mconfig.set_game(opponent_name=msg.get("opponent_name"), ready=False)
+            elif t == "game_started":
+                # turn speichern, damit Battle sofort Turn kennt
+                turn = msg.get("turn")  # "host"/"guest"
+                self.game_manager.mp_turn = turn
 
-            elif msg.get("type") == "opponent_joined":
-                mconfig.set_game(opponent_name=msg.get("opponent_name"), ready=False)
+                # Board + WS in GameManager speichern
+                self.game_manager.player_board = self.player_board
+                self.game_manager.ws = self.ws
 
-            elif msg.get("type") == "game_started":
-                mconfig.set_game(state="game_started")
-                self.game_manager.change_state(config.STATE_MULTIPLAYER_GAME, self.ws)
+                self.game_manager.change_state(config.STATE_MULTIPLAYER_GAME)
+                return
 
+            elif t == "error":
+                self._show_toast(msg.get("detail", "Server error"))
 
     # ------------------------------
     # Update / Input
@@ -262,9 +283,8 @@ class MultiplayerPlacementState(BaseState):
     def update(self, dt, mouse_pos):
         self.player_board.all_ships_placed = self._all_ships_placed()
         self.mouse_pos = mouse_pos
+
         self._process_ws_messages()
-
-
 
         if self.toast_timer > 0:
             self.toast_timer -= dt
@@ -285,7 +305,6 @@ class MultiplayerPlacementState(BaseState):
             self.preview_position = None
             self.placement_valid = False
 
-        # Buttons hover
         self.ready_button.update(dt, mouse_pos[0], mouse_pos[1])
         self.start_button.update(dt, mouse_pos[0], mouse_pos[1])
 
@@ -298,7 +317,7 @@ class MultiplayerPlacementState(BaseState):
             self.ready_button.click()
             return
 
-        if self._can_start_game() and self.start_button.is_hovered(pos[0], pos[1]):
+        if self.host and self._can_start_game() and self.start_button.is_hovered(pos[0], pos[1]):
             self.start_button.click()
             return
 
@@ -409,12 +428,13 @@ class MultiplayerPlacementState(BaseState):
         # Ship list
         self._draw_ship_list(screen)
 
-        # Buttons (Ready/Start abhängig)
+        # Buttons
         if self._can_send_ready():
             self.ready_button.draw(screen, default_color=(30, 110, 70), hover_color=(50, 170, 100))
 
-        if self.local_ready_sent and not self._can_start_game() and self.host:
-            # Wartetext statt Button
+        if self.host and self._can_start_game():
+            self.start_button.draw(screen, default_color=(30, 80, 140), hover_color=(60, 120, 220))
+        elif self.host and self.local_ready_sent:
             draw_text(
                 screen,
                 "WARTEN AUF GEGNER...",
@@ -424,9 +444,6 @@ class MultiplayerPlacementState(BaseState):
                 theme.color_text_secondary,
                 center=True,
             )
-
-        if self._can_start_game() and self.host:
-            self.start_button.draw(screen, default_color=(30, 80, 140), hover_color=(60, 120, 220))
 
         # Toast
         if self.toast_text:
@@ -446,23 +463,23 @@ class MultiplayerPlacementState(BaseState):
         draw_rounded_rect(screen, (0, 0, 0), status_rect, radius=16, alpha=160)
         draw_rounded_rect(screen, theme.color_ship_border, status_rect, radius=16, width=2, alpha=100)
 
-        # Zeilen
         y = status_rect.y + 22
         line_h = 32
 
         code = mconfig.CODE or "-"
         you = mconfig.NAME or "-"
         opp = mconfig.OPPONENT_NAME or "Warte auf Gegner..."
-        conn = "ONLINE" if mconfig.CONNECTION else "OFFLINE"
+        conn = "ONLINE" if self.ws.is_connected() else "OFFLINE"
 
-        # READY-Text: lokales ready vs server ready
         local_ready = "JA" if self.local_ready_sent else "NEIN"
         server_ready = "JA" if mconfig.READY else "NEIN"
+        board_sent = "JA" if self.board_sent else "NEIN"
 
         draw_text(screen, f"ROOM: {code}", status_rect.x + 20, y, 26, theme.color_text_primary); y += line_h
         draw_text(screen, f"DU: {you}", status_rect.x + 20, y, 26, theme.color_text_primary); y += line_h
         draw_text(screen, f"GEGNER: {opp}", status_rect.x + 20, y, 26, theme.color_text_primary); y += line_h
         draw_text(screen, f"STATUS: {conn}", status_rect.x + 20, y, 26, theme.color_text_secondary); y += line_h
+        draw_text(screen, f"BOARD GESENDET: {board_sent}", status_rect.x + 20, y, 26, theme.color_text_secondary); y += line_h
         draw_text(screen, f"DU BEREIT: {local_ready}", status_rect.x + 20, y, 26, theme.color_text_secondary); y += line_h
         draw_text(screen, f"SPIEL STARTBAR: {server_ready}", status_rect.x + 20, y, 26, theme.color_text_secondary)
 

@@ -1,54 +1,55 @@
 """
-Kampf-State
-Spieler vs Computer
+Multiplayer Kampf-State
+Spieler vs Spieler über WebSocket (Server ist "Source of Truth")
 """
 
 import os
-import random
 import pygame
 from pygame import Rect
+
 import game.config as config
 from game.entities.board import Board
-from game.ai import create_ai
-from game.graphics import draw_gradient_background, draw_rounded_rect, ParticleSystem, draw_text, draw_grid_cell
+from game.graphics import (
+    draw_gradient_background,
+    draw_rounded_rect,
+    ParticleSystem,
+    draw_text,
+    draw_grid_cell,
+)
 from game.theme import theme_manager
 from game.states.base_state import BaseState
-
 import game.multiplayer.multiplayer_config as mconfig
+
+from game.config import CELL_HIT, CELL_MISS  # CELL_DESTROYED ist in Cell.mark_destroyed()
 
 
 class MultiplayerBattleState(BaseState):
-    """Kampf-Phase: Spieler gegen Computer"""
+    """Kampf-Phase: Multiplayer"""
 
     def __init__(self, game_manager):
-        """Initialisiert die Kampfphase"""
         super().__init__(game_manager)
-        self.ws = self.game_manager.ws
 
-        self.host = mconfig.HOST
+        self.ws = getattr(self.game_manager, "ws", None)
+        if self.ws is None:
+            raise RuntimeError("game_manager.ws ist None (WSClient fehlt).")
 
-        self.player_board = game_manager.player_board
+        self.player_board = getattr(self.game_manager, "player_board", None)
+        if self.player_board is None:
+            raise RuntimeError("game_manager.player_board ist None (Placement hat es nicht gesetzt).")
+
+        self.host = (mconfig.ROLE == "host")
+        self.role = "host" if self.host else "guest"
 
         self.opponent_board = Board(config.COMPUTER_GRID_X, config.GRID_OFFSET_Y, "Opponent")
 
-
-
-        self.player_turn: bool
-        self.game_over: bool
+        self.player_turn: bool = False
+        self.game_over: bool = False
         self.winner = None
+        self.message = "WAITING FOR GAME START..."
 
-        self.message = "AWAITING ORDERS - SELECT TARGET"
-
-        self.computer_delay = 0
-        self.computer_delay_time = config.BATTLE_COMPUTER_DELAY_TIME
-
-        self.game_over_delay = config.BATTLE_GAME_OVER_DELAY
-        self.game_over_timer = None
-
-        # Effekte
         self.particles = ParticleSystem()
 
-        # Special Schüsse
+        # Specials UI
         self.abilities = {
             "airstrike": {"charges": 1, "targeted": True},
             "guided": {"charges": 1, "targeted": False},
@@ -56,13 +57,146 @@ class MultiplayerBattleState(BaseState):
             "napalm": {"charges": 1, "targeted": True},
         }
         self.selected_ability = None
-        self.active_fires = []
-
         self.ability_buttons = []
         self._load_ability_icons()
         self._rebuild_ability_buttons()
 
+        # Start-turn aus Placement (damit Battle nicht "hängt")
+        initial_turn = getattr(self.game_manager, "mp_turn", None)
+        if isinstance(initial_turn, str) and initial_turn in ("host", "guest"):
+            self._set_turn(initial_turn)
+        else:
+            self.message = "WAITING FOR GAME START... (no turn)"
 
+    # ---------------- Turn / Marking helpers ----------------
+
+    def _set_turn(self, turn: str):
+        self.player_turn = (turn == self.role)
+        self.message = "YOUR TURN - SELECT TARGET" if self.player_turn else "OPPONENT TURN..."
+
+    def _mark_opponent_cell(self, row: int, col: int, hit: bool):
+        cell = self.opponent_board.get_cell(row, col)
+        if not cell or cell.is_shot():
+            return
+        cell.scan_marked = False
+        cell.scan_found_ship = False
+        cell.napalm_marked = False
+        cell.player_marker = False
+        cell.status = CELL_HIT if hit else CELL_MISS
+
+    def _apply_destroyed_cells_on_opponent(self, destroyed_cells):
+        # destroyed_cells erwartet: [[row,col], ...]
+        if not isinstance(destroyed_cells, list):
+            return
+        for rc in destroyed_cells:
+            if not isinstance(rc, list) or len(rc) != 2:
+                continue
+            r, c = rc
+            if not isinstance(r, int) or not isinstance(c, int):
+                continue
+            cell = self.opponent_board.get_cell(r, c)
+            if cell:
+                cell.mark_destroyed()
+
+    def _spawn_effects(self, board, row, col, hit):
+        x = board.x_offset + col * config.CELL_SIZE + config.CELL_SIZE // 2
+        y = board.y_offset + row * config.CELL_SIZE + config.CELL_SIZE // 2
+        if hit:
+            self.particles.add_explosion(x, y, count=40, color=(255, 60, 20))
+        else:
+            self.particles.add_splash(x, y, count=25)
+
+    # ---------------- WS processing ----------------
+
+    def _apply_shot_result(self, msg: dict):
+        by = msg.get("by")
+        x = msg.get("x")  # col
+        y = msg.get("y")  # row
+        hit = bool(msg.get("hit"))
+        destroyed = bool(msg.get("destroyed"))
+        destroyed_cells = msg.get("destroyed_cells", [])
+        next_turn = msg.get("next_turn")
+
+        if not isinstance(x, int) or not isinstance(y, int):
+            return
+
+        row, col = y, x
+
+        if by == self.role:
+            # du hast geschossen -> Gegnerboard markieren
+            self._mark_opponent_cell(row, col, hit)
+            self._spawn_effects(self.opponent_board, row, col, hit)
+            if destroyed:
+                self._apply_destroyed_cells_on_opponent(destroyed_cells)
+                self.message = "SHIP DESTROYED!"
+            else:
+                self.message = "HIT!" if hit else "MISS!"
+        else:
+            # Gegner hat auf dich geschossen -> echtes Board schießen
+            hit2, destroyed2, ship = self.player_board.shoot(row, col)
+            self._spawn_effects(self.player_board, row, col, hit2)
+            self.message = "YOU WERE HIT!" if hit2 else "OPPONENT MISSED!"
+
+        if isinstance(next_turn, str) and next_turn in ("host", "guest"):
+            self._set_turn(next_turn)
+
+    def _apply_ability_result(self, msg: dict):
+        ability = msg.get("ability")
+        by = msg.get("by")
+        results = msg.get("results", [])
+        next_turn = msg.get("next_turn")
+
+        # Ergebnisse markieren
+        if isinstance(results, list):
+            for r in results:
+                if not isinstance(r, dict):
+                    continue
+                row = r.get("row")
+                col = r.get("col")
+                hit = bool(r.get("hit"))
+                destroyed = bool(r.get("destroyed"))
+                destroyed_cells = r.get("destroyed_cells", [])
+
+                if not isinstance(row, int) or not isinstance(col, int):
+                    continue
+
+                if by == self.role:
+                    self._mark_opponent_cell(row, col, hit)
+                    self._spawn_effects(self.opponent_board, row, col, hit)
+                    if destroyed:
+                        self._apply_destroyed_cells_on_opponent(destroyed_cells)
+                else:
+                    # Gegner-Ability trifft dich
+                    hit2, destroyed2, ship = self.player_board.shoot(row, col)
+                    self._spawn_effects(self.player_board, row, col, hit2)
+
+        self.message = f"{str(ability).upper()} RESOLVED"
+
+        if isinstance(next_turn, str) and next_turn in ("host", "guest"):
+            self._set_turn(next_turn)
+
+    def _apply_sonar_result(self, msg: dict):
+        # {"type":"sonar_result","cells":[[r,c],...],"found":[[r,c],...]}
+        cells = msg.get("cells", [])
+        found = set()
+        for rc in msg.get("found", []) if isinstance(msg.get("found", []), list) else []:
+            if isinstance(rc, list) and len(rc) == 2 and isinstance(rc[0], int) and isinstance(rc[1], int):
+                found.add((rc[0], rc[1]))
+
+        # Markieren auf Gegnerboard (scan_marked / scan_found_ship)
+        if isinstance(cells, list):
+            for rc in cells:
+                if not isinstance(rc, list) or len(rc) != 2:
+                    continue
+                r, c = rc
+                if not isinstance(r, int) or not isinstance(c, int):
+                    continue
+                cell = self.opponent_board.get_cell(r, c)
+                if cell and not cell.is_shot():
+                    cell.scan_marked = True
+                    cell.scan_found_ship = (r, c) in found
+
+        self.message = "SONAR COMPLETE"
 
     def _process_ws_messages(self):
         while True:
@@ -70,24 +204,44 @@ class MultiplayerBattleState(BaseState):
             if msg is None:
                 break
 
-            # Debug:
-            print("WS IN:", msg)
+            t = msg.get("type")
 
-            if msg.type("game_started"):
-                if msg.type("turn") == "host" and self.host:
-                    self.player_turn = True
-                elif msg.type("turn") == "guest" and self.host:
-                    self.player_turn = False
+            if t == "game_started":
+                turn = msg.get("turn")
+                if isinstance(turn, str) and turn in ("host", "guest"):
+                    self.game_manager.mp_turn = turn
+                    self._set_turn(turn)
 
+            elif t == "shot_result":
+                self._apply_shot_result(msg)
 
-                elif msg.type("turn") == "guest" and not self.host:
-                    self.player_turn = True
-                elif msg.type("turn") == "host" and not self.host:
-                    self.player_turn = False
+            elif t == "ability_result":
+                self._apply_ability_result(msg)
 
+            elif t == "sonar_result":
+                self._apply_sonar_result(msg)
 
+            elif t == "turn_update":
+                turn = msg.get("turn")
+                if isinstance(turn, str) and turn in ("host", "guest"):
+                    self._set_turn(turn)
 
+            elif t == "destroyed_update":
+                # optional extra event vom server
+                self._apply_destroyed_cells_on_opponent(msg.get("cells", []))
 
+            elif t == "game_over":
+                winner = msg.get("winner")
+                if isinstance(winner, str) and winner in ("host", "guest"):
+                    mconfig.set_game(winner=winner)
+                    self.game_manager.winner = winner
+                self.game_manager.change_state(config.STATE_GAME_OVER)
+                return
+
+            elif t == "error":
+                self.message = msg.get("detail", "SERVER ERROR")
+
+    # ---------------- UI / input ----------------
 
     def _load_icon(self, filename):
         path = os.path.join("images", filename)
@@ -120,335 +274,83 @@ class MultiplayerBattleState(BaseState):
             rect = pygame.Rect(start_x + idx * (size + spacing), y, size, size)
             self.ability_buttons.append((name, rect))
 
-    def _ability_display_name(self, ability_key):
-        is_modern = theme_manager.current.name == "MODERN"
-        names = {
-            "airstrike": "LUFTSCHLAG" if is_modern else "BREITSEITE",
-            "guided": "LENKRAKETE" if is_modern else "ENTERHAKEN",
-            "sonar": "SONAR" if is_modern else "KRÄHENNEST",
-            "napalm": "NAPALM" if is_modern else "GRIECHISCHES FEUER",
-        }
-        return names.get(ability_key, "SPEZIALFÄHIGKEIT")
-
-    def _activate_ability(self, name):
-        if not self.player_turn or self.abilities[name]["charges"] <= 0:
-            return
-
-        if name == "guided":
-            self._use_guided_missile()
-            return
-
-        self.selected_ability = name
-        label = {
-            "airstrike": f"{self._ability_display_name('airstrike')} AKTIV (+)",
-            "sonar": f"{self._ability_display_name('sonar')} AKTIV (3x3)",
-            "napalm": f"{self._ability_display_name('napalm')} AKTIV",
-        }
-        self.message = label.get(name, "SPEZIALFÄHIGKEIT AKTIV")
-
     def update(self, dt, mouse_pos):
-        """Aktualisiert die Kampfphase"""
         self.particles.update(dt)
         self._process_ws_messages()
 
-        if self.game_over_timer is not None:
-            self.game_over_timer -= dt
-            if self.game_over_timer <= 0:
-                self.game_manager.change_state(config.STATE_GAME_OVER)
-
-        if self.game_over:
+    def _send_ability(self, ability: str, row: int | None = None, col: int | None = None):
+        if ability == "guided":
+            self.ws.send_json({"type": "ability", "ability": "guided"})
             return
-
-        # Computer-Zug mit Verzoegerung
-        if not self.player_turn:
-            self.computer_delay += dt
-            if self.computer_delay >= self.computer_delay_time:
-                self._computer_turn()
-                self.computer_delay = 0
+        if row is None or col is None:
+            return
+        # server expects x=col, y=row
+        self.ws.send_json({"type": "ability", "ability": ability, "x": col, "y": row})
 
     def on_mouse_down(self, pos, button):
-        """Behandelt Mausklicks"""
-        if button not in (1, 3) or not self.player_turn or self.game_over:
+        if button not in (1, 3) or self.game_over:
             return
 
+        # Marker (rechtsklick) auf Gegnerboard
         if button == 3:
-            self._toggle_player_marker(pos)
+            cell_pos = self.opponent_board.get_cell_at_pos(pos[0], pos[1])
+            if not cell_pos:
+                return
+            row, col = cell_pos
+            cell = self.opponent_board.get_cell(row, col)
+            if not cell:
+                return
+            if cell.is_shot() or cell.scan_marked or cell.napalm_marked:
+                return
+            cell.player_marker = not cell.player_marker
             return
 
+        # nur wenn du dran bist
+        if not self.player_turn:
+            return
+
+        # ability buttons
         for name, rect in self.ability_buttons:
             if rect.collidepoint(pos):
-                self._activate_ability(name)
+                if self.abilities[name]["charges"] <= 0:
+                    return
+                self.selected_ability = name
                 return
 
-        cell_pos = self.computer_board.get_cell_at_pos(pos[0], pos[1])
+        # click on opponent grid
+        cell_pos = self.opponent_board.get_cell_at_pos(pos[0], pos[1])
         if not cell_pos:
             return
-
         row, col = cell_pos
-        if self.selected_ability == "airstrike":
-            self._player_airstrike(row, col)
-        elif self.selected_ability == "sonar":
-            self._player_sonar(row, col)
-        elif self.selected_ability == "napalm":
-            self._player_napalm(row, col)
-        else:
-            self._player_shoot(row, col)
 
-    def _toggle_player_marker(self, pos):
-        cell_pos = self.computer_board.get_cell_at_pos(pos[0], pos[1])
-        if not cell_pos:
+        # ability handling
+        if self.selected_ability:
+            ability = self.selected_ability
+            self.selected_ability = None
+            self.abilities[ability]["charges"] = 0
+            self._send_ability(ability, row=row, col=col)
+            self.message = f"{ability.upper()} SENT..."
             return
 
-        row, col = cell_pos
-        cell = self.computer_board.get_cell(row, col)
-        if not cell:
-            return
-
-        # Marker nur auf aktuell neutralen Feldern erlauben.
-        if cell.is_shot() or cell.scan_marked or cell.napalm_marked:
-            return
-
-        cell.player_marker = not cell.player_marker
-
-    def _spawn_effects(self, board, row, col, hit):
-        """Spawnt Partikel an der getroffenen Zelle"""
-        x = board.x_offset + col * config.CELL_SIZE + config.CELL_SIZE // 2
-        y = board.y_offset + row * config.CELL_SIZE + config.CELL_SIZE // 2
-        if hit:
-            self.particles.add_explosion(x, y, count=40, color=(255, 60, 20))
-        else:
-            self.particles.add_splash(x, y, count=25)
-
-    def _shoot_with_napalm_rules(self, row, col):
-        """U-Boot ist immun, deshalb anderer Marker statt miss"""
-        cell = self.computer_board.get_cell(row, col)
+        # normal shot
+        cell = self.opponent_board.get_cell(row, col)
         if not cell or cell.is_shot():
-            return False, False
-
-        self.game_manager.shots_fired += 1
-        cell.scan_marked = False
-        cell.scan_found_ship = False
-        cell.player_marker = False
-
-        if not cell.has_ship():
-            cell.napalm_marked = True
-            self._spawn_effects(self.computer_board, row, col, False)
-            return False, False
-
-        if cell.ship and cell.ship.name.split(" #", 1)[0] in ("U-Boot", "Schaluppe"):
-            cell.napalm_marked = True
-            self._spawn_effects(self.computer_board, row, col, False)
-            return False, False
-
-        hit, destroyed, _ = self.computer_board.shoot(row, col)
-        self._spawn_effects(self.computer_board, row, col, hit)
-        if hit:
-            self.game_manager.shots_hit += 1
-        return hit, destroyed
-
-    def _player_airstrike(self, center_row, center_col):
-        """Fuehrt einen Airstrike (+ muster) aus."""
-        self.abilities["airstrike"]["charges"] = 0
-        self.selected_ability = None
-
-        hit_any = False
-        destroyed_any = False
-
-        # Airstrike visual effect at center
-        coords = [
-            (center_row, center_col),
-            (center_row - 1, center_col),
-            (center_row + 1, center_col),
-            (center_row, center_col - 1),
-            (center_row, center_col + 1),
-        ]
-
-        cx = self.computer_board.x_offset + center_col * config.CELL_SIZE + config.CELL_SIZE // 2
-        cy = self.computer_board.y_offset + center_row * config.CELL_SIZE + config.CELL_SIZE // 2
-        self.particles.add_explosion(cx, cy, count=100, color=(255, 200, 50))
-
-        for r, c in coords:
-            cell = self.computer_board.get_cell(r, c)
-            if cell and not cell.is_shot():
-                self.game_manager.shots_fired += 1
-                hit, destroyed, _ = self.computer_board.shoot(r, c)
-                self._spawn_effects(self.computer_board, r, c, hit)
-                if hit:
-                    self.game_manager.shots_hit += 1
-                    hit_any = True
-                if destroyed:
-                    destroyed_any = True
-
-        if destroyed_any:
-            self.message = theme_manager.current.text_airstrike_critical
-        elif hit_any:
-            self.message = theme_manager.current.text_airstrike_success
-        else:
-            self.message = theme_manager.current.text_airstrike_miss
-
-        self._check_game_over_after_player_action(hit_any)
-
-    def _use_guided_missile(self):
-        candidates = []
-        for row in range(config.GRID_SIZE):
-            for col in range(config.GRID_SIZE):
-                cell = self.computer_board.get_cell(row, col)
-                if cell and cell.has_ship() and not cell.is_shot():
-                    candidates.append((row, col))
-
-        if not candidates: # sollte nicht passieren
-            self.message = f"KEIN GÜLTIGES ZIEL FÜR {self._ability_display_name('guided')}"
             return
 
-        row, col = random.choice(candidates)
-        self.abilities["guided"]["charges"] = 0
+        self.ws.send_json({"type": "shot", "x": col, "y": row})
+        self.message = "SHOT FIRED..."
 
-        self.game_manager.shots_fired += 1
-        hit, destroyed, _ = self.computer_board.shoot(row, col)
-        self._spawn_effects(self.computer_board, row, col, hit)
-        if hit:
-            self.game_manager.shots_hit += 1
-
-        if destroyed:
-            self.message = f"{self._ability_display_name('guided')}: ZIEL VERSENKT!"
-        else:
-            self.message = f"{self._ability_display_name('guided')} HAT BEI ({row + 1}, {col + 1}) GETROFFEN!"
-
-        self._check_game_over_after_player_action(hit)
-
-    def _player_sonar(self, center_row, center_col):
-        self.abilities["sonar"]["charges"] = 0
-        self.selected_ability = None
-
-        found_positions = []
-
-        for r in range(center_row - 1, center_row + 2):
-            for c in range(center_col - 1, center_col + 2):
-                cell = self.computer_board.get_cell(r, c)
-                if not cell or cell.is_shot():
-                    continue
-                cell.scan_marked = True
-                cell.scan_found_ship = cell.has_ship()
-                cell.player_marker = False
-                if cell.has_ship():
-                    found_positions.append((r + 1, c + 1))
-
-        if found_positions:
-            coords_text = ", ".join(f"({r},{c})" for r, c in found_positions)
-            self.message = f"{self._ability_display_name('sonar')} KONTAKTE: {coords_text}"
-        else:
-            self.message = f"{self._ability_display_name('sonar')}: KEINE SCHIFFE GESICHTET"
-
-        self._check_game_over_after_player_action(False, force_end_turn=True, preserve_message=True)
-
-    def _player_napalm(self, row, col):
-        self.abilities["napalm"]["charges"] = 0
-        self.selected_ability = None
-
-        hit, _ = self._shoot_with_napalm_rules(row, col)
-        fire = {
-            "turns_left": 3,
-            "burning_cells": {(row, col)},
-            "expanded_to": {(row, col)},
-        }
-        self.active_fires.append(fire)
-
-        if hit:
-            self.message = f"{self._ability_display_name('napalm')} ENTZÜNDET - TREFFER!"
-        else:
-            self.message = f"{self._ability_display_name('napalm')} ENTZÜNDET"
-
-        self._check_game_over_after_player_action(hit, force_end_turn=True, preserve_message=True)
-
-    def _progress_fires(self):
-        if not self.active_fires:
-            return False
-
-        hit_any = False
-        for fire in self.active_fires:
-            if fire["turns_left"] <= 0:
-                continue
-
-            candidates = set()
-            for row, col in fire["burning_cells"]:
-                for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                    nr, nc = row + dr, col + dc
-                    if (nr, nc) in fire["expanded_to"]:
-                        continue
-                    if self.computer_board.get_cell(nr, nc):
-                        candidates.add((nr, nc))
-
-            spread_targets = random.sample(list(candidates), min(3, len(candidates))) if candidates else []
-            new_burning = set()
-            for tr, tc in spread_targets:
-                fire["expanded_to"].add((tr, tc))
-                new_burning.add((tr, tc))
-                hit, _ = self._shoot_with_napalm_rules(tr, tc)
-                if hit:
-                    hit_any = True
-
-            fire["burning_cells"].update(new_burning)
-            fire["turns_left"] -= 1
-
-        self.active_fires = [f for f in self.active_fires if f["turns_left"] > 0]
-        return hit_any
-
-    def _player_shoot(self, row, col):
-        """Spieler schiesst"""
-        theme = theme_manager.current
-        cell = self.computer_board.get_cell(row, col)
-
-        if cell.is_shot():
-            self.message = theme.text_already_compromised
-            return
-
-        self.game_manager.shots_fired += 1
-        hit, destroyed, _ = self.computer_board.shoot(row, col)
-
-        self._spawn_effects(self.computer_board, row, col, hit)
-
-        if hit:
-            self.game_manager.shots_hit += 1
-            self.message = theme.text_target_destroyed if destroyed else theme.text_target_hit
-        else:
-            self.message = theme.text_target_miss
-
-        self._check_game_over_after_player_action(hit)
-
-    def _check_game_over_after_player_action(self, hit, force_end_turn=False, preserve_message=False):
-        fire_hit = self._progress_fires()
-        any_hit = hit or fire_hit
-
-        if self.computer_board.all_ships_destroyed():
-            self.game_over = True
-            self.winner = "Player"
-            self._end_game()
-            return
-
-        if force_end_turn or not any_hit:
-            self.player_turn = False
-            if preserve_message:
-                self.message = f"{self.message} - {theme_manager.current.text_computer_turn}"
-            else:
-                self.message = theme_manager.current.text_computer_turn
-
-
-
-    def _end_game(self):
-        """Beendet das Spiel"""
-        self.game_manager.winner = self.winner
-        self.game_over_timer = self.game_over_delay
+    # ---------------- drawing ----------------
 
     def _draw_ability_buttons(self, screen):
         for name, rect in self.ability_buttons:
             charges = self.abilities[name]["charges"]
-            active = self.selected_ability == name
             enabled = charges > 0 and self.player_turn and not self.game_over
 
             base = (45, 75, 120) if enabled else (45, 45, 45)
             hover = (85, 130, 200) if enabled else (70, 70, 70)
             color = hover if rect.collidepoint(pygame.mouse.get_pos()) else base
-            border = (255, 215, 0) if active else (160, 210, 255)
+            border = (255, 215, 0) if self.selected_ability == name else (160, 210, 255)
 
             draw_rounded_rect(screen, (0, 0, 0), rect.move(0, 4), radius=8, alpha=120)
             draw_rounded_rect(screen, color, rect, radius=8, alpha=230)
@@ -462,46 +364,9 @@ class MultiplayerBattleState(BaseState):
 
             draw_text(screen, str(charges), rect.right - 12, rect.top + 6, 24, (255, 255, 255), center=True)
 
-    def draw(self, screen):
-        """Zeichnet die Kampfphase"""
-        theme = theme_manager.current
-        # Tactical Background
-        draw_gradient_background(screen, time_value=self.game_manager.time_elapsed)
-
-        # Title Menu Bar / Status
-        panel_rect = Rect(
-            config.WINDOW_WIDTH // 2 - config.BATTLE_PANEL_WIDTH // 2,
-            config.BATTLE_PANEL_Y,
-            config.BATTLE_PANEL_WIDTH,
-            config.BATTLE_PANEL_HEIGHT,
-        )
-        draw_rounded_rect(screen, (0, 0, 0), panel_rect, radius=20, alpha=150)
-        draw_rounded_rect(screen, theme.color_ship_border, panel_rect, radius=20, width=3, alpha=100)
-
-        # Status Message (Glowing)
-        msg_color = theme.color_text_primary if self.player_turn else theme.color_text_enemy
-        draw_text(screen, self.message, config.WINDOW_WIDTH // 2, panel_rect.centery, config.BATTLE_STATUS_FONT_SIZE, msg_color, center=True)
-
-        # Board Headers
-        draw_text(screen, theme.text_battle_player_radar, config.PLAYER_GRID_X, config.GRID_OFFSET_Y - 80, config.BATTLE_HEADER_FONT_SIZE, theme.color_text_secondary)
-        draw_text(screen, theme.text_battle_enemy_radar, config.COMPUTER_GRID_X, config.GRID_OFFSET_Y - 80, config.BATTLE_HEADER_FONT_SIZE, theme.color_text_enemy)
-
-        # Zeichne Boards
-        self._draw_board(screen, self.player_board, show_ships=True, is_enemy=False)
-        self._draw_board(screen, self.computer_board, show_ships=False, is_enemy=True)
-
-        # Draw particles
-        self._draw_ability_buttons(screen)
-        self.particles.draw(screen)
-
-        # Statistiken
-        self._draw_statistics(screen)
-
     def _draw_board(self, screen, board, show_ships=True, is_enemy=False):
-        """Zeichnet ein Spielfeld"""
         theme = theme_manager.current
 
-        # Draw board background glow (Blue for player, Red for enemy)
         bg_rect = Rect(
             board.x_offset - 10,
             board.y_offset - 10,
@@ -518,64 +383,34 @@ class MultiplayerBattleState(BaseState):
                 x = board.x_offset + col * config.CELL_SIZE
                 y = board.y_offset + row * config.CELL_SIZE
                 cell = board.get_cell(row, col)
-
                 draw_grid_cell(screen, x, y, cell, is_enemy=is_enemy, show_ships=show_ships)
 
-        # Koordinaten-Labels
         label_color = (150, 200, 255) if not is_enemy else (255, 150, 150)
         for i in range(config.GRID_SIZE):
-            draw_text(
-                screen,
-                str(i + 1),
-                board.x_offset - 35,
-                board.y_offset + i * config.CELL_SIZE + config.CELL_SIZE // 2 - 12,
-                config.BATTLE_LABEL_FONT_SIZE,
-                label_color,
-            )
-            draw_text(
-                screen,
-                chr(65 + i),
-                board.x_offset + i * config.CELL_SIZE + config.CELL_SIZE // 2,
-                board.y_offset - 30,
-                config.BATTLE_LABEL_FONT_SIZE,
-                label_color,
-                center=True,
-            )
+            draw_text(screen, str(i + 1), board.x_offset - 35, board.y_offset + i * config.CELL_SIZE + config.CELL_SIZE // 2 - 12, config.BATTLE_LABEL_FONT_SIZE, label_color)
+            draw_text(screen, chr(65 + i), board.x_offset + i * config.CELL_SIZE + config.CELL_SIZE // 2, board.y_offset - 30, config.BATTLE_LABEL_FONT_SIZE, label_color, center=True)
 
-    def _draw_statistics(self, screen):
-        """Zeichnet Statistiken in modernen Panels"""
-        y = config.GRID_OFFSET_Y + config.GRID_SIZE * config.CELL_SIZE + config.BATTLE_STAT_PANEL_OFFSET_Y
+    def draw(self, screen):
+        theme = theme_manager.current
+        draw_gradient_background(screen, time_value=self.game_manager.time_elapsed)
 
-        # Player Panel
-        p_rect = Rect(config.PLAYER_GRID_X, y, config.BATTLE_STAT_PANEL_WIDTH, config.BATTLE_STAT_PANEL_HEIGHT)
-        draw_rounded_rect(screen, (0, 0, 0), p_rect, radius=15, alpha=150)
-        draw_rounded_rect(screen, (50, 150, 255), p_rect, radius=15, width=3, alpha=100)
-
-        player_ships_alive = sum(1 for ship in self.player_board.ships if not ship.is_destroyed())
-        player_ships_total = len(self.player_board.ships)
-
-        draw_text(
-            screen,
-            f"EIGENE SCHIFFE EINSATZBEREIT: {player_ships_alive}/{player_ships_total}",
-            config.PLAYER_GRID_X + 25,
-            y + 25,
-            config.BATTLE_STAT_FONT_SIZE,
-            (100, 255, 100),
+        panel_rect = Rect(
+            config.WINDOW_WIDTH // 2 - config.BATTLE_PANEL_WIDTH // 2,
+            config.BATTLE_PANEL_Y,
+            config.BATTLE_PANEL_WIDTH,
+            config.BATTLE_PANEL_HEIGHT,
         )
+        draw_rounded_rect(screen, (0, 0, 0), panel_rect, radius=20, alpha=150)
+        draw_rounded_rect(screen, theme.color_ship_border, panel_rect, radius=20, width=3, alpha=100)
 
-        # Computer Panel
-        c_rect = Rect(config.COMPUTER_GRID_X, y, config.BATTLE_STAT_PANEL_WIDTH, config.BATTLE_STAT_PANEL_HEIGHT)
-        draw_rounded_rect(screen, (0, 0, 0), c_rect, radius=15, alpha=150)
-        draw_rounded_rect(screen, (255, 50, 50), c_rect, radius=15, width=3, alpha=100)
+        msg_color = theme.color_text_primary if self.player_turn else theme.color_text_enemy
+        draw_text(screen, self.message, config.WINDOW_WIDTH // 2, panel_rect.centery, config.BATTLE_STATUS_FONT_SIZE, msg_color, center=True)
 
-        computer_ships_alive = sum(1 for ship in self.computer_board.ships if not ship.is_destroyed())
-        computer_ships_total = len(self.computer_board.ships)
+        draw_text(screen, theme.text_battle_player_radar, config.PLAYER_GRID_X, config.GRID_OFFSET_Y - 80, config.BATTLE_HEADER_FONT_SIZE, theme.color_text_secondary)
+        draw_text(screen, theme.text_battle_enemy_radar, config.COMPUTER_GRID_X, config.GRID_OFFSET_Y - 80, config.BATTLE_HEADER_FONT_SIZE, theme.color_text_enemy)
 
-        draw_text(
-            screen,
-            f"GEGNERISCHE SCHIFFE AKTIV: {computer_ships_alive}/{computer_ships_total}",
-            config.COMPUTER_GRID_X + 25,
-            y + 25,
-            config.BATTLE_STAT_FONT_SIZE,
-            (255, 100, 100),
-        )
+        self._draw_board(screen, self.player_board, show_ships=True, is_enemy=False)
+        self._draw_board(screen, self.opponent_board, show_ships=False, is_enemy=True)
+
+        self._draw_ability_buttons(screen)
+        self.particles.draw(screen)

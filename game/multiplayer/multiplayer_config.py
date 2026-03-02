@@ -2,8 +2,8 @@
 Multiplayer Config
 """
 
-MULTIPLAYER_SERVER_URL = "http://46.224.135.187:8000/"
-MULTIPLAYER_WS_URL = "ws://46.224.135.187:8000/ws/"
+MULTIPLAYER_SERVER_URL = "http://127.0.0.1:8000/" #"http://46.224.135.187:8000/"
+MULTIPLAYER_WS_URL = "ws://127.0.0.1:8000/ws/" #"ws://46.224.135.187:8000/ws/"
 CONNECTION = False
 CHECK_CONNECTION_INTERVAL = 5
 CHECK_CONNECTION = True
@@ -13,7 +13,7 @@ CHECK_CONNECTION_ACTIVE = False
 GAME_STATE = None
 
 
-HOST: bool | None
+
 CODE: str | None = None
 NAME: str | None = None
 PLAYER_TOKEN: str | None = None
@@ -27,8 +27,8 @@ WINNER: str | None = None
 
 
 
-def change_vars(code=None, name=None, player_token=None, role=None, host=None):
-    global CODE, NAME, PLAYER_TOKEN, ROLE, HOST
+def change_vars(code=None, name=None, player_token=None, role=None):
+    global CODE, NAME, PLAYER_TOKEN, ROLE
     if code is not None:
         CODE = code
     if name is not None:
@@ -37,8 +37,7 @@ def change_vars(code=None, name=None, player_token=None, role=None, host=None):
         PLAYER_TOKEN = player_token
     if role is not None:
         ROLE = role
-    if host is not None:
-        HOST = host
+
 
 def connection_status(status: bool):
     global CONNECTION
