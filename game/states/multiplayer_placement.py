@@ -59,20 +59,6 @@ class MultiplayerPlacementState(SharedPlacementState):
         self.ws.send_json({"type": "set_board", "ships": ships_payload})
         self.board_sent = True
 
-    # ------------------------------
-    # Multiplayer UI logic
-    # ------------------------------
-    def _build_ready_button(self):
-        return GlowButton(
-            config.WINDOW_WIDTH - config.BATTLE_AIRSTRIKE_BUTTON_WIDTH // 2 - 30,
-            config.WINDOW_HEIGHT - config.BATTLE_AIRSTRIKE_BUTTON_HEIGHT // 2 - 30,
-            config.BATTLE_AIRSTRIKE_BUTTON_WIDTH,
-            config.BATTLE_AIRSTRIKE_BUTTON_HEIGHT,
-            "BEREIT",
-            self._on_ready_clicked,
-        )
-
-
     def _can_send_ready(self):
         return self._all_ships_placed() and (not self.local_ready_sent)
 
@@ -156,44 +142,27 @@ class MultiplayerPlacementState(SharedPlacementState):
             elif t == "error":
                 self._show_toast(msg.get("detail", "Server error"))
 
+    def _handle_action_button_click(self, pos):
+        self.ready_button.click()
     # ------------------------------
     # Update / Input
     # ------------------------------
     def update(self, dt, mouse_pos):
-        self.player_board.all_ships_placed = self._all_ships_placed()
-        self.mouse_pos = mouse_pos
-
         self._process_ws_messages()
-
         if self.toast_timer > 0:
             self.toast_timer -= dt
             if self.toast_timer <= 0:
                 self.toast_text = ""
-
-        if self.selected_ship:
-            cell_pos = self.player_board.get_cell_at_pos(mouse_pos[0], mouse_pos[1])
-            if cell_pos:
-                self.preview_position = cell_pos
-                self.placement_valid = self.player_board.can_place_ship(
-                    self.selected_ship, cell_pos[0], cell_pos[1], self.current_orientation
-                )
-            else:
-                self.preview_position = None
-                self.placement_valid = False
-        else:
-            self.preview_position = None
-            self.placement_valid = False
-
-        self.ready_button.update(dt, mouse_pos[0], mouse_pos[1])
-
-
-
+        super().update(dt, mouse_pos)
 
     # ------------------------------
     # Draw
     # ------------------------------
 
-
+    def draw(self, screen):
+        super().draw(screen)
+        if self.toast_text:
+            self._draw_toast(screen, self.toast_text)
 
     def _draw_status_panels(self, screen):
         self._draw_multiplayer_status(screen)
