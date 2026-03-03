@@ -246,6 +246,15 @@ class MultiplayerBattleState(SharedBattleState):
                     cell.napalm_marked = True
                 self._spawn_effects(self.player_board, row, col, hit2)
 
+    def _game_over(self, winner):
+        if isinstance(winner, str) and winner in ("host", "guest"):
+            if winner == self.role:
+                self.game_manager.winner = "Player"
+            else:
+                self.game_manager.winner = "Opponent"
+            mconfig.set_game(winner=winner)
+        self.game_manager.change_state(config.STATE_GAME_OVER)
+
     def _process_ws_messages(self):
         while True:
             msg = self.ws.poll()
@@ -254,43 +263,38 @@ class MultiplayerBattleState(SharedBattleState):
 
             t = msg.get("type")
 
-            if t == "game_started":
-                turn = msg.get("turn")
-                if isinstance(turn, str) and turn in ("host", "guest"):
+            match t:
+                case "game_started":
+                    turn = msg.get("turn")
                     self.game_manager.mp_turn = turn
                     self._set_turn(turn)
 
-            elif t == "shot_result":
-                self._apply_shot_result(msg)
+                case "shot_result":
+                    self._apply_shot_result(msg)
 
-            elif t == "ability_result":
-                self._apply_ability_result(msg)
+                case "ability_result":
+                    self._apply_ability_result(msg)
 
-            elif t == "sonar_result":
-                self._apply_sonar_result(msg)
+                case "sonar_result":
+                    self._apply_sonar_result(msg)
 
-            elif t == "fire_tick":
-                self._apply_fire_tick(msg)
+                case "fire_tick":
+                    self._apply_fire_tick(msg)
 
-            elif t == "turn_update":
-                turn = msg.get("turn")
-                if isinstance(turn, str) and turn in ("host", "guest"):
+                case "turn_update":
+                    turn = msg.get("turn")
                     self._set_turn(turn)
 
-            elif t == "destroyed_update":
-                # optional extra event vom server
-                self._apply_destroyed_cells_on_opponent(msg.get("cells", []))
+                case "destroyed_update":
+                    self._apply_destroyed_cells_on_opponent(msg.get("cells", []))
 
-            elif t == "game_over":
-                winner = msg.get("winner")
-                if isinstance(winner, str) and winner in ("host", "guest"):
-                    mconfig.set_game(winner=winner)
-                    self.game_manager.winner = winner
-                self.game_manager.change_state(config.STATE_GAME_OVER)
-                return
+                case "game_over":
+                    winner = msg.get("winner")
+                    self._game_over(winner)
+                    return
 
-            elif t == "error":
-                self.message = msg.get("detail", "SERVER ERROR")
+                case "error":
+                    self.message = msg.get("detail", "SERVER ERROR")
 
     # ---------------- UI / input ----------------
 
