@@ -64,3 +64,14 @@ def set_game(state=None, opponent_name=None, ready=None, winner=None):
         READY = ready
     if winner is not None:
         WINNER = winner
+
+
+def reset():
+    global CODE, PLAYER_TOKEN, ROLE, OPPONENT_NAME, READY, WINNER, GAME_STATE
+    CODE = None
+    PLAYER_TOKEN = None
+    ROLE = None
+    OPPONENT_NAME = None
+    READY = False
+    WINNER = None
+    GAME_STATE = None

@@ -24,6 +24,8 @@ from game.states.join_game import JoinGameState
 from game.states.multiplayer_placement import MultiplayerPlacementState
 from game.states.multiplayer_battle import MultiplayerBattleState
 
+from game.multiplayer.multiplayer_config import reset as mp_reset
+
 
 class GameManager:
     """Zentrale Spielverwaltung mit State-Pattern"""
@@ -71,6 +73,7 @@ class GameManager:
         self.shots_fired = 0
         self.shots_hit = 0
         self.mp_turn = None
+        mp_reset()
 
     def update(self, dt, mouse_pos):
         self.time_elapsed += dt
