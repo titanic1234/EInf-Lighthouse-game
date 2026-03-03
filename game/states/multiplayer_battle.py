@@ -17,7 +17,7 @@ from game.graphics import (
 from game.theme import theme_manager
 import game.multiplayer.multiplayer_config as mconfig
 
-from game.config import CELL_HIT, CELL_MISS  # CELL_DESTROYED ist in Cell.mark_destroyed()
+from game.config import CELL_HIT, CELL_MISS
 from game.states.shared_battle import SharedBattleState
 
 
@@ -33,7 +33,6 @@ class MultiplayerBattleState(SharedBattleState):
         self.role = "host" if self.host else "guest"
 
         # eigener Board kommt aus Placement (GameManager.player_board)
-        # Gegnerboard ist Fog-of-war Board
         self.opponent_board = Board(config.COMPUTER_GRID_X, config.GRID_OFFSET_Y, "Opponent")
 
         self.player_turn: bool = False
@@ -41,7 +40,6 @@ class MultiplayerBattleState(SharedBattleState):
         self.winner = None
         self.message = "WAITING FOR GAME START..."
 
-        # Start-turn aus Placement (damit Battle nicht "hängt")
         initial_turn = getattr(self.game_manager, "mp_turn", None)
         if isinstance(initial_turn, str) and initial_turn in ("host", "guest"):
             self._set_turn(initial_turn)
@@ -54,27 +52,31 @@ class MultiplayerBattleState(SharedBattleState):
         self.player_turn = (turn == self.role)
         self.message = "YOUR TURN - SELECT TARGET" if self.player_turn else "OPPONENT TURN..."
 
-    def _mark_opponent_cell(self, row: int, col: int, hit: bool, keep_napalm: bool = True):
+    def _mark_opponent_cell(self, row: int, col: int, hit: bool, *, napalm_only: bool = False):
         """
-        Wichtig für Napalm:
-        - napalm_marked darf NICHT bei jedem hit/miss zurückgesetzt werden,
-          sonst sieht man im Multiplayer nie "Feuer", sondern nur Shot-States.
+        Markiert die Fog-of-war Zelle.
+        - Wenn napalm_only=True: NUR napalm_marked setzen, KEIN HIT/MISS setzen.
+        - Sonst: normal HIT/MISS setzen.
         """
         cell = self.opponent_board.get_cell(row, col)
-        if not cell or cell.is_shot():
+        if not cell:
             return
 
+        # UI-Flags (wie beim normalen shot)
         cell.scan_marked = False
         cell.scan_found_ship = False
         cell.player_marker = False
 
-        if not keep_napalm:
-            cell.napalm_marked = False
+        if napalm_only:
+            cell.napalm_marked = True
+            # KEIN status setzen -> sonst sieht's wie "shot" aus
+            return
 
-        cell.status = CELL_HIT if hit else CELL_MISS
+        # normaler Shot/Ability result:
+        if not cell.is_shot():
+            cell.status = CELL_HIT if hit else CELL_MISS
 
     def _apply_destroyed_cells_on_opponent(self, destroyed_cells):
-        # destroyed_cells erwartet: [[row,col], ...]
         if not isinstance(destroyed_cells, list):
             return
         for rc in destroyed_cells:
@@ -115,16 +117,18 @@ class MultiplayerBattleState(SharedBattleState):
 
         if by == self.role:
             # du hast geschossen -> Gegnerboard markieren
-            self._mark_opponent_cell(row, col, hit, keep_napalm=True)
+            self._mark_opponent_cell(row, col, hit, napalm_only=False)
             self._spawn_effects(self.opponent_board, row, col, hit)
+
             self.game_manager.shots_fired += 1
-            self.game_manager.shots_hit += 1 if (hit or destroyed) else 0
+            if hit:
+                self.game_manager.shots_hit += 1
+
             if destroyed:
                 self._apply_destroyed_cells_on_opponent(destroyed_cells)
                 self.message = "SHIP DESTROYED!"
             else:
                 self.message = "HIT!" if hit else "MISS!"
-
         else:
             # Gegner hat auf dich geschossen -> echtes Board schießen
             hit2, destroyed2, ship = self.player_board.shoot(row, col)
@@ -140,29 +144,41 @@ class MultiplayerBattleState(SharedBattleState):
         results = msg.get("results", [])
         next_turn = msg.get("next_turn")
 
-        # Ergebnisse markieren
         if isinstance(results, list):
             for r in results:
                 if not isinstance(r, dict):
                     continue
+
                 row = r.get("row")
                 col = r.get("col")
                 hit = bool(r.get("hit"))
                 destroyed = bool(r.get("destroyed"))
                 destroyed_cells = r.get("destroyed_cells", [])
+                napalm_only = bool(r.get("napalm_only", False))
 
                 if not isinstance(row, int) or not isinstance(col, int):
                     continue
 
                 if by == self.role:
-                    self._mark_opponent_cell(row, col, hit, keep_napalm=True)
+                    # du -> Gegnerboard markieren
+                    self._mark_opponent_cell(row, col, hit, napalm_only=napalm_only)
+                    # Effekte: bei napalm_only ist hit sowieso False -> splash ok, oder optional gar kein Effekt
                     self._spawn_effects(self.opponent_board, row, col, hit)
+
                     if destroyed:
                         self._apply_destroyed_cells_on_opponent(destroyed_cells)
                 else:
-                    # Gegner-Ability trifft dich
-                    hit2, destroyed2, ship = self.player_board.shoot(row, col)
-                    self._spawn_effects(self.player_board, row, col, hit2)
+                    # Gegner-Ability trifft dich:
+                    # Wenn napalm_only => in Singleplayer wäre das "nur Feuer" ohne shot.
+                    # Dein lokales Board hat aber keine separate server-state für napalm-only,
+                    # daher markieren wir zumindest visuell napalm_marked.
+                    if napalm_only:
+                        cell = self.player_board.get_cell(row, col)
+                        if cell:
+                            cell.napalm_marked = True
+                    else:
+                        hit2, destroyed2, ship = self.player_board.shoot(row, col)
+                        self._spawn_effects(self.player_board, row, col, hit2)
 
         self.message = f"{str(ability).upper()} RESOLVED"
 
@@ -172,7 +188,6 @@ class MultiplayerBattleState(SharedBattleState):
         # Napalm Start-Zelle optisch markieren (kommt vom Server)
         fire_started = bool(msg.get("fire_started"))
         origin = msg.get("fire_origin")
-
         if fire_started and isinstance(origin, dict):
             r0 = origin.get("row")
             c0 = origin.get("col")
@@ -188,14 +203,12 @@ class MultiplayerBattleState(SharedBattleState):
                         cell.napalm_marked = True
 
     def _apply_sonar_result(self, msg: dict):
-        # {"type":"sonar_result","cells":[[r,c],...],"found":[[r,c],...]}
         cells = msg.get("cells", [])
         found = set()
         for rc in msg.get("found", []) if isinstance(msg.get("found", []), list) else []:
             if isinstance(rc, list) and len(rc) == 2 and isinstance(rc[0], int) and isinstance(rc[1], int):
                 found.add((rc[0], rc[1]))
 
-        # Markieren auf Gegnerboard (scan_marked / scan_found_ship)
         if isinstance(cells, list):
             for rc in cells:
                 if not isinstance(rc, list) or len(rc) != 2:
@@ -213,55 +226,57 @@ class MultiplayerBattleState(SharedBattleState):
     def _apply_fire_tick(self, msg: dict):
         """
         Server:
-          {"type":"fire_tick","results":[{"target_role":"guest","row":..,"col":..,"hit":..,"destroyed":..,"destroyed_cells":[...]}]}
+          {"type":"fire_tick","results":[{"target_role":"guest","row":..,"col":..,"hit":..,"destroyed":..,"destroyed_cells":[...],"napalm_only":bool}]}
         """
         results = msg.get("results", [])
         if not isinstance(results, list):
             return
 
-        # Optional: message setzen (kurz)
         self.message = "FIRE SPREADING..."
 
         for r in results:
             if not isinstance(r, dict):
                 continue
 
-            target_role = r.get("target_role")  # "host" oder "guest"
+            target_role = r.get("target_role")
             row = r.get("row")
             col = r.get("col")
             hit = bool(r.get("hit"))
             destroyed = bool(r.get("destroyed"))
             destroyed_cells = r.get("destroyed_cells", [])
+            napalm_only = bool(r.get("napalm_only", False))
 
             if not isinstance(row, int) or not isinstance(col, int):
                 continue
 
-            # Wenn das Feuer den Gegner trifft, ist target_role der Gegner.
             if target_role != self.role:
-                # Gegnerboard (fog) markieren + Napalm Overlay setzen (auch wenn bereits HIT/MISS)
-                self._mark_opponent_cell(row, col, hit, keep_napalm=True)
+                # Feuer trifft Gegnerboard (Fog)
+                self._mark_opponent_cell(row, col, hit, napalm_only=napalm_only)
                 cell = self.opponent_board.get_cell(row, col)
                 if cell:
-                    cell.napalm_marked = True  # <-- Feuer sichtbar halten
+                    cell.napalm_marked = True
+                # Effekte: bei napalm_only -> splash, sonst hit/miss
                 self._spawn_effects(self.opponent_board, row, col, hit)
 
                 if destroyed:
                     self._apply_destroyed_cells_on_opponent(destroyed_cells)
 
             else:
-                # Feuer trifft dich -> echtes Board schießen + Napalm markieren
-                hit2, destroyed2, ship = self.player_board.shoot(row, col)
-                cell = self.player_board.get_cell(row, col)
-                if cell:
-                    cell.napalm_marked = True
-                self._spawn_effects(self.player_board, row, col, hit2)
+                # Feuer trifft dich
+                if napalm_only:
+                    cell = self.player_board.get_cell(row, col)
+                    if cell:
+                        cell.napalm_marked = True
+                else:
+                    hit2, destroyed2, ship = self.player_board.shoot(row, col)
+                    cell = self.player_board.get_cell(row, col)
+                    if cell:
+                        cell.napalm_marked = True
+                    self._spawn_effects(self.player_board, row, col, hit2)
 
     def _game_over(self, winner):
         if isinstance(winner, str) and winner in ("host", "guest"):
-            if winner == self.role:
-                self.game_manager.winner = "Player"
-            else:
-                self.game_manager.winner = "Opponent"
+            self.game_manager.winner = "Player" if winner == self.role else "Opponent"
             mconfig.set_game(winner=winner)
         self.game_manager.change_state(config.STATE_GAME_OVER)
 
@@ -301,8 +316,7 @@ class MultiplayerBattleState(SharedBattleState):
                     self._apply_destroyed_cells_on_opponent(msg.get("cells", []))
 
                 case "game_over":
-                    winner = msg.get("winner")
-                    self._game_over(winner)
+                    self._game_over(msg.get("winner"))
                     return
 
                 case "error":
@@ -322,14 +336,13 @@ class MultiplayerBattleState(SharedBattleState):
             return
         if row is None or col is None:
             return
-        # server expects x=col, y=row
         self.ws.send_json({"type": "ability", "ability": ability, "x": col, "y": row})
 
     def on_mouse_down(self, pos, button):
         if button not in (1, 3) or self.game_over:
             return
 
-        # Marker (rechtsklick) auf Gegnerboard
+        # Marker (rechtsklick)
         if button == 3:
             cell_pos = self.opponent_board.get_cell_at_pos(pos[0], pos[1])
             if not cell_pos:
@@ -343,7 +356,6 @@ class MultiplayerBattleState(SharedBattleState):
             cell.player_marker = not cell.player_marker
             return
 
-        # nur wenn du dran bist
         if not self.player_turn:
             return
 
@@ -361,7 +373,6 @@ class MultiplayerBattleState(SharedBattleState):
             return
         row, col = cell_pos
 
-        # ability handling
         if self.selected_ability:
             ability = self.selected_ability
             self.selected_ability = None
@@ -370,7 +381,6 @@ class MultiplayerBattleState(SharedBattleState):
             self.message = f"{ability.upper()} SENT..."
             return
 
-        # normal shot
         cell = self.opponent_board.get_cell(row, col)
         if not cell or cell.is_shot():
             return
@@ -418,32 +428,32 @@ class MultiplayerBattleState(SharedBattleState):
         draw_rounded_rect(screen, bg_color, bg_rect, radius=10, alpha=180)
         draw_rounded_rect(screen, border_color, bg_rect, radius=10, width=2, alpha=80)
 
+        ws_connected = self.ws.is_connected() if self.ws else False
+
         for row in range(config.GRID_SIZE):
             for col in range(config.GRID_SIZE):
                 x = board.x_offset + col * config.CELL_SIZE
                 y = board.y_offset + row * config.CELL_SIZE
                 cell = board.get_cell(row, col)
-                draw_grid_cell(screen, x, y, cell, is_enemy=is_enemy, show_ships=show_ships, ws_connected=self.ws.is_connected())
+                draw_grid_cell(
+                    screen,
+                    x,
+                    y,
+                    cell,
+                    is_enemy=is_enemy,
+                    show_ships=show_ships,
+                    ws_connected=ws_connected,
+                )
 
         label_color = (150, 200, 255) if not is_enemy else (255, 150, 150)
         for i in range(config.GRID_SIZE):
-            draw_text(
-                screen,
-                str(i + 1),
-                board.x_offset - 35,
-                board.y_offset + i * config.CELL_SIZE + config.CELL_SIZE // 2 - 12,
-                config.BATTLE_LABEL_FONT_SIZE,
-                label_color,
-            )
-            draw_text(
-                screen,
-                chr(65 + i),
-                board.x_offset + i * config.CELL_SIZE + config.CELL_SIZE // 2,
-                board.y_offset - 30,
-                config.BATTLE_LABEL_FONT_SIZE,
-                label_color,
-                center=True,
-            )
+            draw_text(screen, str(i + 1), board.x_offset - 35,
+                      board.y_offset + i * config.CELL_SIZE + config.CELL_SIZE // 2 - 12,
+                      config.BATTLE_LABEL_FONT_SIZE, label_color)
+            draw_text(screen, chr(65 + i),
+                      board.x_offset + i * config.CELL_SIZE + config.CELL_SIZE // 2,
+                      board.y_offset - 30,
+                      config.BATTLE_LABEL_FONT_SIZE, label_color, center=True)
 
     def draw(self, screen):
         theme = theme_manager.current
@@ -459,32 +469,13 @@ class MultiplayerBattleState(SharedBattleState):
         draw_rounded_rect(screen, theme.color_ship_border, panel_rect, radius=20, width=3, alpha=100)
 
         msg_color = theme.color_text_primary if self.player_turn else theme.color_text_enemy
-        draw_text(
-            screen,
-            self.message,
-            config.WINDOW_WIDTH // 2,
-            panel_rect.centery,
-            config.BATTLE_STATUS_FONT_SIZE,
-            msg_color,
-            center=True,
-        )
+        draw_text(screen, self.message, config.WINDOW_WIDTH // 2, panel_rect.centery,
+                  config.BATTLE_STATUS_FONT_SIZE, msg_color, center=True)
 
-        draw_text(
-            screen,
-            theme.text_battle_player_radar,
-            config.PLAYER_GRID_X,
-            config.GRID_OFFSET_Y - 80,
-            config.BATTLE_HEADER_FONT_SIZE,
-            theme.color_text_secondary,
-        )
-        draw_text(
-            screen,
-            theme.text_battle_enemy_radar,
-            config.COMPUTER_GRID_X,
-            config.GRID_OFFSET_Y - 80,
-            config.BATTLE_HEADER_FONT_SIZE,
-            theme.color_text_enemy,
-        )
+        draw_text(screen, theme.text_battle_player_radar, config.PLAYER_GRID_X, config.GRID_OFFSET_Y - 80,
+                  config.BATTLE_HEADER_FONT_SIZE, theme.color_text_secondary)
+        draw_text(screen, theme.text_battle_enemy_radar, config.COMPUTER_GRID_X, config.GRID_OFFSET_Y - 80,
+                  config.BATTLE_HEADER_FONT_SIZE, theme.color_text_enemy)
 
         self._draw_board(screen, self.player_board, show_ships=True, is_enemy=False)
         self._draw_board(screen, self.opponent_board, show_ships=False, is_enemy=True)

@@ -11,6 +11,12 @@ from game.states.shared_placement import SharedPlacementState
 from game.theme import theme_manager
 
 
+NAPALM_IMMUNE_BASE_NAMES = {"U-Boot"}
+
+
+
+
+
 class MultiplayerPlacementState(SharedPlacementState):
 
     title_text = "MULTIPLAYER - SCHIFFE PLATZIEREN"
@@ -24,7 +30,6 @@ class MultiplayerPlacementState(SharedPlacementState):
         self.ws.start()
         self.game_manager.ws = self.ws
 
-
         # Multiplayer UI / State
         self.local_ready_sent = False
         self.toast_text = ""
@@ -32,23 +37,31 @@ class MultiplayerPlacementState(SharedPlacementState):
         self.host = (mconfig.ROLE == "host")
 
         # Board-Upload state
-        self.board_sent = False  # set_board schon gesendet?
+        self.board_sent = False
 
         # Buttons
         self.ready_button = self.build_primary_action_button("BEREIT", self._on_ready_clicked, 30)
 
+        # Optional: wenn du wirklich "host_name" separat schicken willst,
+        # muss dein Server diese Message verarbeiten.
+        # (Wenn Presence bereits Namen enthält, kannst du das entfernen.)
         if self.host:
             self.ws.send_json({"type": "host_name", "name": mconfig.NAME})
-
-
 
     # ------------------------------
     # Button clicked
     # ------------------------------
     def _send_board_to_server_once(self):
         """
-        Sendet die eigenen Schiffszellen an den Server:
-        {"type":"set_board","ships":[ [[row,col],...], ... ]}
+        Sendet die eigenen Schiffszellen + Meta an den Server:
+
+        {
+          "type": "set_board",
+          "ships": [
+            {"name":"U-Boot", "immune_to_napalm":true, "cells":[[row,col],...]},
+            ...
+          ]
+        }
         """
         if self.board_sent:
             return
@@ -57,7 +70,15 @@ class MultiplayerPlacementState(SharedPlacementState):
 
         ships_payload = []
         for ship in self.player_board.ships:
-            ships_payload.append([[cell.row, cell.col] for cell in ship.cells])
+            base_name = self._base_ship_name(ship.name)
+            cells = [[cell.row, cell.col] for cell in ship.cells]
+
+            ships_payload.append({
+                "name": base_name,
+                # explizit setzen ist besser als Name-Raten auf dem Server
+                "immune_to_napalm": base_name in NAPALM_IMMUNE_BASE_NAMES,
+                "cells": cells,
+            })
 
         self.ws.send_json({"type": "set_board", "ships": ships_payload})
         self.board_sent = True
@@ -77,7 +98,7 @@ class MultiplayerPlacementState(SharedPlacementState):
             self._show_toast("Keine Verbindung zum Server.")
             return
 
-        # ✅ wichtig: erst Board senden, dann ready
+        # erst Board senden, dann ready
         self._send_board_to_server_once()
 
         self.local_ready_sent = True
@@ -88,14 +109,12 @@ class MultiplayerPlacementState(SharedPlacementState):
         if self.ready_button.is_hovered(pos[0], pos[1]):
             self.ready_button.click()
 
-
     # ------------------------------
-    # Graphics
+    # Toast
     # ------------------------------
     def _show_toast(self, text: str, duration: float = 2.0):
         self.toast_text = text
         self.toast_timer = duration
-
 
     # ------------------------------
     # websocket
@@ -109,9 +128,7 @@ class MultiplayerPlacementState(SharedPlacementState):
             t = msg.get("type")
 
             if t == "presence":
-                # Gegnername aus host_name/guest_name
                 opponent = (msg.get("guest_name") if self.host else msg.get("host_name")) or None
-                print(f"Gegner: {msg}")
                 if opponent:
                     mconfig.set_game(opponent_name=opponent)
 
@@ -120,12 +137,15 @@ class MultiplayerPlacementState(SharedPlacementState):
                 opponent = (msg.get("guest_name") if self.host else msg.get("host_name")) or None
                 mconfig.set_game(opponent_name=opponent, ready=ready)
 
+            elif t == "board_set":
+                # Optional debug: zeigt dir, ob der Server dein Board akzeptiert hat
+                # Du kannst hier z.B. toasten wenn role == self.role
+                pass
+
             elif t == "game_started":
-                # turn speichern, damit Battle sofort Turn kennt
-                turn = msg.get("turn")  # "host"/"guest"
+                turn = msg.get("turn")
                 self.game_manager.mp_turn = turn
 
-                # Board + WS in GameManager speichern
                 self.game_manager.player_board = self.player_board
                 self.game_manager.ws = self.ws
 
@@ -135,6 +155,9 @@ class MultiplayerPlacementState(SharedPlacementState):
             elif t == "error":
                 self._show_toast(msg.get("detail", "Server error"))
 
+    @staticmethod
+    def _base_ship_name(name: str) -> str:
+        return (name or "").split(" #", 1)[0].strip()
 
     # ------------------------------
     # Update
@@ -146,7 +169,6 @@ class MultiplayerPlacementState(SharedPlacementState):
             if self.toast_timer <= 0:
                 self.toast_text = ""
         super().update(dt, mouse_pos)
-
 
     # ------------------------------
     # Draw
