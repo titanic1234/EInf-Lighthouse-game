@@ -34,8 +34,11 @@ class BaseComputerAI:
             self.sonar_miss_positions.add(pos)
 
     def get_next_shot(self, board):
-        if self.mode == self.MODE_TARGET and self.possible_targets:
-            return self._pop_next_target(board)
+        if self.mode == self.MODE_TARGET:
+            if not self.possible_targets and self._has_pending_target_info():
+                self._rebuild_targets_from_hits()
+            if self.possible_targets:
+                return self._pop_next_target(board)
 
         sonar_target = self._pop_known_ship_target(board)
         if sonar_target:
@@ -43,6 +46,9 @@ class BaseComputerAI:
             return sonar_target
 
         return self._get_hunt_shot(board)
+
+    def _has_pending_target_info(self):
+        return bool(self.unresolved_hits or self.known_ship_cells)
 
     def _get_hunt_shot(self, board):
         raise NotImplementedError
@@ -107,38 +113,58 @@ class BaseComputerAI:
         for sonar_pos in list(self.known_ship_cells):
             self._append_target_if_valid(*sonar_pos)
 
-        if not self.unresolved_hits:
-            if not self.possible_targets:
-                self.mode = self.MODE_HUNT
-            return
+        hit_clusters = self._get_hit_clusters()
+        if not hit_clusters and not self.possible_targets:
+            self.mode = self.MODE_HUNT
 
         self.mode = self.MODE_TARGET
-        hits = sorted(self.unresolved_hits)
+        for cluster in sorted(hit_clusters, key=len, reverse=True):
+            same_row = len({r for r, _ in cluster}) == 1
+            same_col = len({c for _, c in cluster}) == 1
 
-        same_row = len({r for r, _ in hits}) == 1
-        same_col = len({c for _, c in hits}) == 1
+            if len(cluster) >= 2 and (same_row or same_col):
+                if same_row:
+                    row = cluster[0][0]
+                    cols = sorted(c for _, c in cluster)
+                    self._append_target_if_valid(row, cols[0] - 1)
+                    self._append_target_if_valid(row, cols[-1] + 1)
+                else:
+                    col = cluster[0][1]
+                    rows = sorted(r for r, _ in cluster)
+                    self._append_target_if_valid(rows[0] - 1, col)
+                    self._append_target_if_valid(rows[-1] + 1, col)
 
-        if len(hits) >= 2 and (same_row or same_col):
-            if same_row:
-                row = hits[0][0]
-                cols = sorted(c for _, c in hits)
-                self._append_target_if_valid(row, cols[0] - 1)
-                self._append_target_if_valid(row, cols[-1] + 1)
-            else:
-                col = hits[0][1]
-                rows = sorted(r for r, _ in hits)
-                self._append_target_if_valid(rows[0] - 1, col)
-                self._append_target_if_valid(rows[-1] + 1, col)
+            # Für L-/Carrier-Formen: um jeden bekannten Treffer herum prüfen
+            neighbor_candidates = []
+            for row, col in cluster:
+                for dr, dc in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+                    neighbor_candidates.append((row + dr, col + dc))
 
-        # Für L-/Carrier-Formen: um jeden bekannten Treffer herum prüfen
-        neighbor_candidates = []
-        for row, col in hits:
-            for dr, dc in ((0, 1), (0, -1), (1, 0), (-1, 0)):
-                neighbor_candidates.append((row + dr, col + dc))
+            random.shuffle(neighbor_candidates)
+            for cand_row, cand_col in neighbor_candidates:
+                self._append_target_if_valid(cand_row, cand_col)
 
-        random.shuffle(neighbor_candidates)
-        for cand_row, cand_col in neighbor_candidates:
-            self._append_target_if_valid(cand_row, cand_col)
+    def _get_hit_clusters(self):
+        remaining_hits = set(self.unresolved_hits)
+        clusters = []
+
+        while remaining_hits:
+            start = remaining_hits.pop()
+            stack = [start]
+            cluster = {start}
+
+            while stack:
+                row, col = stack.pop()
+                for dr, dc in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+                    neighbor = (row + dr, col + dc)
+                    if neighbor in remaining_hits:
+                        remaining_hits.remove(neighbor)
+                        cluster.add(neighbor)
+                        stack.append(neighbor)
+
+            clusters.append(sorted(cluster))
+
+        return clusters
 
     def _append_target_if_valid(self, row, col):
         if (
