@@ -81,6 +81,27 @@ class MultiplayerBattleState(SharedBattleState):
             if cell:
                 cell.mark_destroyed()
 
+    def _apply_incoming_strike_on_player(self, row: int, col: int, hit: bool, napalm: bool = False):
+        """Wendet serverbestätigten Treffer auf das eigene Board an.
+
+        Für Napalm gilt: `hit=False` kann auch auf Schiffszellen auftreten
+        (z. B. U-Boot-Immunität). In diesem Fall darf die Zelle NICHT als
+        normaler Schuss verarbeitet werden.
+        """
+        cell = self.player_board.get_cell(row, col)
+        if not cell:
+            return
+
+        if napalm and not hit:
+            cell.napalm_marked = True
+            self._spawn_effects(self.player_board, row, col, False)
+            return
+
+        hit2, _, _ = self.player_board.shoot(row, col)
+        if napalm:
+            cell.napalm_marked = True
+        self._spawn_effects(self.player_board, row, col, hit2)
+
     # ------------------------------
     # websocket processing
     # ------------------------------
@@ -113,7 +134,7 @@ class MultiplayerBattleState(SharedBattleState):
 
         else:
             # Gegner hat auf dich geschossen -> echtes Board schießen
-            hit2, destroyed2, ship = self.player_board.shoot(row, col)
+            hit2, _, _ = self.player_board.shoot(row, col)
             self._spawn_effects(self.player_board, row, col, hit2)
             self.message = "YOU WERE HIT!" if hit2 else "OPPONENT MISSED!"
 
@@ -147,8 +168,7 @@ class MultiplayerBattleState(SharedBattleState):
                         self._apply_destroyed_cells_on_opponent(destroyed_cells)
                 else:
                     # Gegner-Ability trifft dich
-                    hit2, destroyed2, ship = self.player_board.shoot(row, col)
-                    self._spawn_effects(self.player_board, row, col, hit2)
+                    self._apply_incoming_strike_on_player(row, col, hit, napalm=(ability == "napalm"))
 
         self.message = f"{str(ability).upper()} RESOLVED"
 
@@ -236,11 +256,7 @@ class MultiplayerBattleState(SharedBattleState):
 
             else:
                 # Feuer trifft dich -> echtes Board schießen + Napalm markieren
-                hit2, destroyed2, ship = self.player_board.shoot(row, col)
-                cell = self.player_board.get_cell(row, col)
-                if cell:
-                    cell.napalm_marked = True
-                self._spawn_effects(self.player_board, row, col, hit2)
+                self._apply_incoming_strike_on_player(row, col, hit, napalm=True)
 
     def _game_over(self, winner):
         if isinstance(winner, str) and winner in ("host", "guest"):
