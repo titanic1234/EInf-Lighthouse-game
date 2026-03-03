@@ -8,7 +8,6 @@ import game.config as config
 import game.multiplayer.multiplayer_config as mconfig
 
 from game.graphics import draw_gradient_background, GlowButton, draw_title_art
-
 from game.states.base_state import BaseState
 
 
@@ -32,7 +31,7 @@ class MultiplayerLobbyState(BaseState):
         self.focus = "name"
         self.cursor_t = 0.0
 
-        # ---- Layout (CREATE/JOIN GAME über dem Schiff) ----
+        # ---- Layout ----
         center_x = config.WINDOW_WIDTH // 2
         self.field_w = config.MENU_BUTTON_WIDTH
         self.field_h = 70
@@ -46,10 +45,16 @@ class MultiplayerLobbyState(BaseState):
         self.name_rect = pygame.Rect(center_x - self.field_w // 2, fields_top, self.field_w, self.field_h)
         self.room_rect = pygame.Rect(center_x - self.field_w // 2, fields_top + 120, self.field_w, self.field_h)
 
-       # Buttons unter die Felder setzen
+        # Buttons unter die Felder setzen
         self.buttons = []
         self.text_fields = []
 
+        # ---- Clipboard (für Paste) ----
+        self.clipboard_ok = True
+        try:
+            pygame.scrap.init()
+        except Exception:
+            self.clipboard_ok = False
 
     # ------------------------------
     # Button create
@@ -77,16 +82,60 @@ class MultiplayerLobbyState(BaseState):
             ),
         ]
 
-
     # ------------------------------
     # Button clicked
     # ------------------------------
     def _start_game(self):
         """Hook for subclasses."""
+        pass
 
     def _back_menu(self):
         self.game_manager.change_state(config.STATE_MULTIPLAYER_MENU)
 
+    # ------------------------------
+    # Clipboard helpers (Paste)
+    # ------------------------------
+    def _get_clipboard_text(self) -> str:
+        if not self.clipboard_ok:
+            return ""
+        try:
+            raw = pygame.scrap.get(pygame.SCRAP_TEXT)
+            if not raw:
+                return ""
+            return raw.decode("utf-8", errors="ignore").replace("\x00", "")
+        except Exception:
+            return ""
+
+    def _paste_into_room(self):
+        """Paste in Room Code: A-Z0-9, uppercase, max_len."""
+        if self.room_locked:
+            return
+        clip = self._get_clipboard_text().strip()
+        if not clip:
+            return
+
+        filtered = "".join(ch for ch in clip.upper() if ch.isalnum())
+        if not filtered:
+            return
+
+        remaining = self.room_max_len - len(self.room_text)
+        if remaining <= 0:
+            return
+        self.room_text += filtered[:remaining]
+
+    def _paste_into_name(self):
+        """Optional: Paste in Name (filter control chars), max_len."""
+        clip = self._get_clipboard_text().strip()
+        if not clip:
+            return
+        filtered = "".join(ch for ch in clip if ch >= " " and ch not in "\r\n\t")
+        if not filtered:
+            return
+
+        remaining = self.name_max_len - len(self.name_text)
+        if remaining <= 0:
+            return
+        self.name_text += filtered[:remaining]
 
     # ------------------------------
     # Events
@@ -105,12 +154,10 @@ class MultiplayerLobbyState(BaseState):
             if self.room_locked:
                 # gesperrt -> kopieren statt fokussieren
                 self._copy_room_code()
-
-            elif not self.room_locked:
+            else:
                 self.focus = "room"
                 self.cursor_t = 0.0
             return
-
 
         for btn in self.buttons:
             if btn.hovered:
@@ -152,9 +199,17 @@ class MultiplayerLobbyState(BaseState):
             self._copy_room_code()
             return
 
-        # -------- Texteingabe über KEYDOWN (funktioniert immer) --------
+        # ✅ STRG+V Paste
+        if key == keys.V and (mod & keymods.CTRL):
+            if self.focus == "room" and not self.room_locked:
+                self._paste_into_room()
+            elif self.focus == "name":
+                self._paste_into_name()
+            return
+
+        # -------- Texteingabe über KEYDOWN --------
         mods = mod
-        if mods & (keymods.ALT | keymods.META):
+        if mods & (keymods.CTRL | keymods.ALT | keymods.META):
             return
 
         # Name: Buchstaben/Zahlen/Space usw.
@@ -213,15 +268,14 @@ class MultiplayerLobbyState(BaseState):
             if len(self.name_text) < self.name_max_len:
                 self.name_text += ch
         elif self.focus == "room" and not self.room_locked:
+            # hier nur digits wie vorher
             if ch.isdigit() and len(self.room_text) < self.room_max_len:
                 self.room_text += ch
-
 
     # ------------------------------
     # Draw
     # ------------------------------
     def _draw_textbox(self, screen, rect, value, placeholder, focused, locked=False):
-        # Farben aus config (optional erweiterbar)
         bg = getattr(config, "COLOR_INPUT_BG", (15, 25, 45))
         border = getattr(config, "COLOR_INPUT_BORDER", (70, 110, 170))
         border_focus = getattr(config, "COLOR_INPUT_FOCUS", (120, 180, 255))
@@ -229,7 +283,6 @@ class MultiplayerLobbyState(BaseState):
         text_col = getattr(config, "COLOR_TEXT_PRIMARY", config.COLOR_WHITE)
         hint_col = getattr(config, "COLOR_TEXT_SECONDARY", (150, 165, 190))
 
-        # Locked optisch etwas gedimmt
         if locked:
             border = config.COLOR_DARK_GRAY
             border_focus = config.COLOR_DARK_GRAY
@@ -237,7 +290,6 @@ class MultiplayerLobbyState(BaseState):
         pygame.draw.rect(screen, bg, rect, border_radius=14)
         pygame.draw.rect(screen, border_focus if focused else border, rect, width=3, border_radius=14)
 
-        # Textgröße hier ändern:
         font = pygame.font.Font(None, getattr(config, "INPUT_FONT_SIZE", config.FONT_SIZE_SMALL))
 
         shown = value if value else placeholder
@@ -245,7 +297,6 @@ class MultiplayerLobbyState(BaseState):
         surf = font.render(shown, True, col)
         screen.blit(surf, (rect.x + 16, rect.centery - surf.get_height() // 2))
 
-        # Cursor blink (nur wenn nicht locked)
         if focused and (not locked) and (int(self.cursor_t * 2) % 2 == 0):
             cx = rect.x + 16 + min(rect.w - 32, 12 * len(value))
             pygame.draw.line(screen, text_col, (cx, rect.y + 10), (cx, rect.bottom - 10), 2)
@@ -254,7 +305,6 @@ class MultiplayerLobbyState(BaseState):
         draw_gradient_background(screen, time_value=self.game_manager.time_elapsed)
         draw_title_art(screen)
 
-        # Titel
         title_font = pygame.font.Font(None, config.MENU_TITLE_FONT_SIZE)
 
         shadow_surf = title_font.render("Schiffe Versenken", True, config.COLOR_BLACK)
@@ -265,19 +315,16 @@ class MultiplayerLobbyState(BaseState):
         title_rect = title_surf.get_rect(center=(config.WINDOW_WIDTH // 2, config.MENU_TITLE_Y))
         screen.blit(title_surf, title_rect)
 
-        # Untertitel
         sub_font = pygame.font.Font(None, config.MENU_SUBTITLE_FONT_SIZE)
         sub_surf = sub_font.render("Operation Lighthouse", True, config.COLOR_LIGHT_GRAY)
         sub_rect = sub_surf.get_rect(center=(config.WINDOW_WIDTH // 2, config.MENU_SUBTITLE_Y))
         screen.blit(sub_surf, sub_rect)
 
-        # Heading: ÜBER dem Schiff
         heading_font = pygame.font.Font(None, config.FONT_SIZE_LARGE)
         heading = heading_font.render(self.text, True, config.COLOR_WHITE)
         heading_rect = heading.get_rect(center=(config.WINDOW_WIDTH // 2, self.heading_y - 30))
         screen.blit(heading, heading_rect)
 
-        # Labels
         label_font = pygame.font.Font(None, config.FONT_SIZE_SMALL)
         host_lbl = label_font.render("Your Name:", True, config.COLOR_LIGHT_GRAY)
         screen.blit(host_lbl, host_lbl.get_rect(center=(config.WINDOW_WIDTH // 2, self.name_rect.y - 22)))
@@ -285,7 +332,6 @@ class MultiplayerLobbyState(BaseState):
         room_lbl = label_font.render("Room Code:", True, config.COLOR_LIGHT_GRAY)
         screen.blit(room_lbl, room_lbl.get_rect(center=(config.WINDOW_WIDTH // 2, self.room_rect.y - 22)))
 
-        # Textfelder
         self.text_fields = [
             self._draw_textbox(
                 screen,
@@ -304,14 +350,11 @@ class MultiplayerLobbyState(BaseState):
                 locked=self.room_locked,
             )
         ]
-        # Buttons
+
         for button in self.buttons:
             button.draw(screen)
 
-        # Footer
         info_font = pygame.font.Font(None, config.MENU_INFO_FONT_SIZE)
         info_surf = info_font.render("Steuerung: Maus", True, config.COLOR_GRAY)
-        info_rect = info_surf.get_rect(
-            center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT - config.MENU_INFO_MARGIN_BOTTOM)
-        )
+        info_rect = info_surf.get_rect(center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT - config.MENU_INFO_MARGIN_BOTTOM))
         screen.blit(info_surf, info_rect)
