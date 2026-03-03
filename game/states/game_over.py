@@ -49,11 +49,19 @@ class GameOverState(BaseState):
 
     def _new_game(self):
         """Startet ein neues Spiel"""
+        multiplayer = self.game_manager.ws.is_connected()
+        self.game_manager.ws.stop()
         self.game_manager.reset_game()
-        self.game_manager.change_state(config.STATE_PLACEMENT)
+        if multiplayer:
+            self.game_manager.change_state(config.STATE_MULTIPLAYER_MENU)
+        else:
+            self.game_manager.change_state(config.STATE_PLACEMENT)
+
+
 
     def _main_menu(self):
         """Zurueck zum Hauptmenue"""
+        self.game_manager.ws.stop()
         self.game_manager.reset_game()
         self.game_manager.change_state(config.STATE_MENU)
 

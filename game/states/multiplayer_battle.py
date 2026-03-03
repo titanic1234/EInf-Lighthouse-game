@@ -117,11 +117,14 @@ class MultiplayerBattleState(SharedBattleState):
             # du hast geschossen -> Gegnerboard markieren
             self._mark_opponent_cell(row, col, hit, keep_napalm=True)
             self._spawn_effects(self.opponent_board, row, col, hit)
+            self.game_manager.shots_fired += 1
+            self.game_manager.shots_hit += 1 if (hit or destroyed) else 0
             if destroyed:
                 self._apply_destroyed_cells_on_opponent(destroyed_cells)
                 self.message = "SHIP DESTROYED!"
             else:
                 self.message = "HIT!" if hit else "MISS!"
+
         else:
             # Gegner hat auf dich geschossen -> echtes Board schießen
             hit2, destroyed2, ship = self.player_board.shoot(row, col)
