@@ -23,9 +23,8 @@ class BattleState(SharedBattleState):
         super().__init__(game_manager)
 
         self.computer_board = Board(config.COMPUTER_GRID_X, config.GRID_OFFSET_Y, "Computer")
-        self.computer_board.place_ships_randomly()
-
         self.ai = create_ai(game_manager.ai_difficulty)
+        self.ai.place_ships(self.computer_board)
 
         self.player_turn = True
         self.game_over = False

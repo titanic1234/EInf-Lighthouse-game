@@ -1,4 +1,4 @@
-"""Standard KI, Hunt raster und random abilities"""
+"""Standard KI. Hunt raster, random abilities, smarteres placement"""
 
 import random
 from game.config import GRID_SIZE
@@ -7,6 +7,7 @@ from game.ai.base_ai import BaseComputerAI
 
 class NormalComputerAI(BaseComputerAI):
     DEFAULT_ABILITIES = {"airstrike": 1, "guided": 1, "sonar": 1, "napalm": 1,}
+
     def __init__(self):
         super().__init__()
         self.parity_offset = random.randint(0, 1)
@@ -24,6 +25,38 @@ class NormalComputerAI(BaseComputerAI):
 
         row, col = self.get_next_shot(board)
         return {"type": "shoot", "row": row, "col": col}
+
+    def _choose_ship_placement(self, board, ship):
+        placements = self._collect_possible_placements(board, ship)
+        if not placements:
+            return None
+
+        occupied_cells = self._occupied_ship_cells(board)
+        if not occupied_cells:
+            return random.choice(placements)
+
+        spread_weight = random.uniform(1.7, 3.0)
+        noise = random.uniform(1.8, 3.0)
+
+        scored = []
+        for row, col, orientation in placements:
+            coordinates = ship.get_coordinates_at(row, col, orientation)
+            score = spread_weight * self._distance_to_other_ships(coordinates, occupied_cells)
+            score += random.uniform(-noise, noise)
+            scored.append((score, row, col, orientation))
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        top_pool_size = min(max(4, len(scored) // 5), len(scored))
+        top_pool = scored[:top_pool_size]
+        chosen = random.choice(top_pool)
+        return chosen[1], chosen[2], chosen[3]
+
+    def _distance_to_other_ships(self, coordinates, occupied_cells):
+        total = 0
+        for row, col in coordinates:
+            nearest = min(abs(row - other_row) + abs(col - other_col) for other_row, other_col in occupied_cells)
+            total += nearest
+        return total / max(1, len(coordinates))
 
     def _random_untried(self, board):
         available = self._available_positions(board)
