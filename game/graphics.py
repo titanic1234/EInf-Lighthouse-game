@@ -297,7 +297,7 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True, ws_conne
             scan_scaled = scale_sprite_to_cell(scan_sprite, config.CELL_SIZE, fill_ratio=0.65)
             screen.blit(scan_scaled, scan_scaled.get_rect(center=cell_rect.center))
 
-    if cell.napalm_marked and (not cell.is_shot() or ws_connected):
+    if cell.napalm_marked:
         icon = _get_status_icon("napalm")
         if icon:
             icon_surf = scale_sprite_to_cell(icon, config.CELL_SIZE, fill_ratio=0.78)
@@ -315,7 +315,7 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True, ws_conne
         if hit_sprite:
             hit_scaled = scale_sprite_to_cell(hit_sprite, config.CELL_SIZE, fill_ratio=0.9)
             screen.blit(hit_scaled, hit_scaled.get_rect(center=cell_rect.center))
-    elif cell.status == config.CELL_MISS and not(ws_connected and cell.napalm_marked):
+    elif cell.status == config.CELL_MISS:
         miss_sprite = _get_ui_sprite("miss")
         if miss_sprite:
             miss_scaled = scale_sprite_to_cell(miss_sprite, config.CELL_SIZE, fill_ratio=0.55)

@@ -3,17 +3,11 @@ Multiplayer Kampf-State
 Spieler vs Spieler über WebSocket (Server ist "Source of Truth")
 """
 
-import pygame
-from pygame import Rect
+from pgzero.rect import Rect
 
 import game.config as config
 from game.entities.board import Board
-from game.graphics import (
-    draw_gradient_background,
-    draw_rounded_rect,
-    draw_text,
-    draw_grid_cell,
-)
+from game.graphics import draw_rounded_rect, draw_text,draw_grid_cell
 from game.theme import theme_manager
 import game.multiplayer.multiplayer_config as mconfig
 
@@ -86,14 +80,6 @@ class MultiplayerBattleState(SharedBattleState):
             cell = self.opponent_board.get_cell(r, c)
             if cell:
                 cell.mark_destroyed()
-
-    def _spawn_effects(self, board, row, col, hit):
-        x = board.x_offset + col * config.CELL_SIZE + config.CELL_SIZE // 2
-        y = board.y_offset + row * config.CELL_SIZE + config.CELL_SIZE // 2
-        if hit:
-            self.particles.add_explosion(x, y, count=40, color=(255, 60, 20))
-        else:
-            self.particles.add_splash(x, y, count=25)
 
     # ------------------------------
     # websocket processing
@@ -312,7 +298,7 @@ class MultiplayerBattleState(SharedBattleState):
     # Input / Update
     # ------------------------------
 
-    def update(self, dt, mouse_pos):
+    def _update_pipeline(self, dt, mouse_pos):
         self.particles.update(dt)
         self._process_ws_messages()
 
@@ -325,84 +311,43 @@ class MultiplayerBattleState(SharedBattleState):
         # server expects x=col, y=row
         self.ws.send_json({"type": "ability", "ability": ability, "x": col, "y": row})
 
-    def on_mouse_down(self, pos, button):
-        if button not in (1, 3) or self.game_over:
+    def _use_guided_missile(self):
+        if self.abilities["guided"]["charges"] <= 0:
             return
+        self.abilities["guided"]["charges"] = 0
+        self._send_ability("guided")
+        self.selected_ability = None
+        self.message = f"{self._ability_display_name('guided')} SENT..."
 
-        # Marker (rechtsklick) auf Gegnerboard
-        if button == 3:
-            cell_pos = self.opponent_board.get_cell_at_pos(pos[0], pos[1])
-            if not cell_pos:
-                return
-            row, col = cell_pos
-            cell = self.opponent_board.get_cell(row, col)
-            if not cell:
-                return
-            if cell.is_shot() or cell.scan_marked or cell.napalm_marked:
-                return
-            cell.player_marker = not cell.player_marker
-            return
-
-        # nur wenn du dran bist
-        if not self.player_turn:
-            return
-
-        # ability buttons
-        for name, rect in self.ability_buttons:
-            if rect.collidepoint(pos):
-                if self.abilities[name]["charges"] <= 0:
-                    return
-                self.selected_ability = name
-                return
-
-        # click on opponent grid
-        cell_pos = self.opponent_board.get_cell_at_pos(pos[0], pos[1])
-        if not cell_pos:
-            return
-        row, col = cell_pos
-
-        # ability handling
-        if self.selected_ability:
-            ability = self.selected_ability
-            self.selected_ability = None
-            self.abilities[ability]["charges"] = 0
-            self._send_ability(ability, row=row, col=col)
-            self.message = f"{ability.upper()} SENT..."
-            return
-
+    def _player_shoot(self, row, col):
         # normal shot
         cell = self.opponent_board.get_cell(row, col)
         if not cell or cell.is_shot():
             return
-
         self.ws.send_json({"type": "shot", "x": col, "y": row})
         self.message = "SHOT FIRED..."
+
+    def _player_airstrike(self, row, col):
+        self.abilities["airstrike"]["charges"] = 0
+        self.selected_ability = None
+        self._send_ability("airstrike", row=row, col=col)
+        self.message = f"{self._ability_display_name('airstrike')} SENT..."
+
+    def _player_sonar(self, row, col):
+        self.abilities["sonar"]["charges"] = 0
+        self.selected_ability = None
+        self._send_ability("sonar", row=row, col=col)
+        self.message = f"{self._ability_display_name('sonar')} SENT..."
+
+    def _player_napalm(self, row, col):
+        self.abilities["napalm"]["charges"] = 0
+        self.selected_ability = None
+        self._send_ability("napalm", row=row, col=col)
+        self.message = f"{self._ability_display_name('napalm')} SENT..."
 
     # ------------------------------
     # Draw
     # ------------------------------
-
-    def _draw_ability_buttons(self, screen):
-        for name, rect in self.ability_buttons:
-            charges = self.abilities[name]["charges"]
-            enabled = charges > 0 and self.player_turn and not self.game_over
-
-            base = (45, 75, 120) if enabled else (45, 45, 45)
-            hover = (85, 130, 200) if enabled else (70, 70, 70)
-            color = hover if rect.collidepoint(pygame.mouse.get_pos()) else base
-            border = (255, 215, 0) if self.selected_ability == name else (160, 210, 255)
-
-            draw_rounded_rect(screen, (0, 0, 0), rect.move(0, 4), radius=8, alpha=120)
-            draw_rounded_rect(screen, color, rect, radius=8, alpha=230)
-            draw_rounded_rect(screen, border, rect, radius=8, width=2, alpha=255)
-
-            icon = self.ability_icons.get(name)
-            if icon:
-                icon_surf = pygame.transform.smoothscale(icon, (42, 42))
-                icon_rect = icon_surf.get_rect(center=rect.center)
-                screen.blit(icon_surf, icon_rect)
-
-            draw_text(screen, str(charges), rect.right - 12, rect.top + 6, 24, (255, 255, 255), center=True)
 
     def _draw_board(self, screen, board, show_ships=True, is_enemy=False):
         theme = theme_manager.current
@@ -446,48 +391,4 @@ class MultiplayerBattleState(SharedBattleState):
             )
 
     def draw(self, screen):
-        theme = theme_manager.current
-        draw_gradient_background(screen, time_value=self.game_manager.time_elapsed)
-
-        panel_rect = Rect(
-            config.WINDOW_WIDTH // 2 - config.BATTLE_PANEL_WIDTH // 2,
-            config.BATTLE_PANEL_Y,
-            config.BATTLE_PANEL_WIDTH,
-            config.BATTLE_PANEL_HEIGHT,
-        )
-        draw_rounded_rect(screen, (0, 0, 0), panel_rect, radius=20, alpha=150)
-        draw_rounded_rect(screen, theme.color_ship_border, panel_rect, radius=20, width=3, alpha=100)
-
-        msg_color = theme.color_text_primary if self.player_turn else theme.color_text_enemy
-        draw_text(
-            screen,
-            self.message,
-            config.WINDOW_WIDTH // 2,
-            panel_rect.centery,
-            config.BATTLE_STATUS_FONT_SIZE,
-            msg_color,
-            center=True,
-        )
-
-        draw_text(
-            screen,
-            theme.text_battle_player_radar,
-            config.PLAYER_GRID_X,
-            config.GRID_OFFSET_Y - 80,
-            config.BATTLE_HEADER_FONT_SIZE,
-            theme.color_text_secondary,
-        )
-        draw_text(
-            screen,
-            theme.text_battle_enemy_radar,
-            config.COMPUTER_GRID_X,
-            config.GRID_OFFSET_Y - 80,
-            config.BATTLE_HEADER_FONT_SIZE,
-            theme.color_text_enemy,
-        )
-
-        self._draw_board(screen, self.player_board, show_ships=True, is_enemy=False)
-        self._draw_board(screen, self.opponent_board, show_ships=False, is_enemy=True)
-
-        self._draw_ability_buttons(screen)
-        self.particles.draw(screen)
+        super().draw(screen)
