@@ -631,11 +631,3 @@ class BattleState(SharedBattleState):
             config.BATTLE_STAT_FONT_SIZE,
             (255, 100, 100),
         )
-
-    def on_resize(self, width, height):
-        self.player_board.x_offset = config.PLAYER_GRID_X
-        self.player_board.y_offset = config.GRID_OFFSET_Y
-        self.computer_board.x_offset = config.COMPUTER_GRID_X
-        self.computer_board.y_offset = config.GRID_OFFSET_Y
-        self._rebuild_ability_buttons()
-        self._load_ability_icons()

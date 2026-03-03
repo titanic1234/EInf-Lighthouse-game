@@ -261,7 +261,7 @@ def _get_transformed_ship_surface(ship, grid_width, grid_height, orientation, sh
         return transformed
 
 
-def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True):
+def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True, ws_connected: bool = False):
     """Zeichnet eine Zelle als sprite"""
     theme = theme_manager.current
     cell_rect = pygame.Rect(x, y, config.CELL_SIZE, config.CELL_SIZE)
@@ -297,7 +297,7 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True):
             scan_scaled = scale_sprite_to_cell(scan_sprite, config.CELL_SIZE, fill_ratio=0.65)
             screen.blit(scan_scaled, scan_scaled.get_rect(center=cell_rect.center))
 
-    if cell.napalm_marked and not cell.is_shot():
+    if cell.napalm_marked and (not cell.is_shot() or ws_connected):
         icon = _get_status_icon("napalm")
         if icon:
             icon_surf = scale_sprite_to_cell(icon, config.CELL_SIZE, fill_ratio=0.78)
@@ -315,7 +315,7 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True):
         if hit_sprite:
             hit_scaled = scale_sprite_to_cell(hit_sprite, config.CELL_SIZE, fill_ratio=0.9)
             screen.blit(hit_scaled, hit_scaled.get_rect(center=cell_rect.center))
-    elif cell.status == config.CELL_MISS:
+    elif cell.status == config.CELL_MISS and not(ws_connected and cell.napalm_marked):
         miss_sprite = _get_ui_sprite("miss")
         if miss_sprite:
             miss_scaled = scale_sprite_to_cell(miss_sprite, config.CELL_SIZE, fill_ratio=0.55)
