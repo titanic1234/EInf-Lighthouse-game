@@ -1,7 +1,8 @@
 """Parent class mit Basislogik für Computer-KIs."""
 
 import random
-from game.config import GRID_SIZE
+from game.config import GRID_SIZE, SHIP_TYPES, ORIENTATION_COUNT
+from game.entities.ship import Ship
 
 
 class BaseComputerAI:
@@ -20,6 +21,58 @@ class BaseComputerAI:
         """Wird von Unterklassen überschrieben. Rückgabe: dict(type=..., row=..., col=...)."""
         row, col = self.get_next_shot(board)
         return {"type": "shoot", "row": row, "col": col}
+
+    def place_ships(self, board):
+        """Platziert Schiffe für diese KI. Standard: vollständig zufällig."""
+        for ship_type in SHIP_TYPES:
+            ship_name, ship_length, ship_count = ship_type[:3]
+            ship_shape = ship_type[3] if len(ship_type) > 3 else None
+            for _ in range(ship_count):
+                ship = Ship(ship_name, ship_length, shape=ship_shape)
+                placement = self._choose_ship_placement(board, ship)
+                if placement:
+                    row, col, orientation = placement
+                    board.place_ship(ship, row, col, orientation)
+                    continue
+
+                # robuster Fallback
+                self._place_ship_randomly(board, ship)
+
+        board.all_ships_placed = True
+
+    def _choose_ship_placement(self, board, ship):
+        placements = self._collect_possible_placements(board, ship)
+        if not placements:
+            return None
+        return random.choice(placements)
+
+    def _collect_possible_placements(self, board, ship):
+        placements = []
+        for orientation in range(ORIENTATION_COUNT):
+            for row in range(GRID_SIZE):
+                for col in range(GRID_SIZE):
+                    if board.can_place_ship(ship, row, col, orientation):
+                        placements.append((row, col, orientation))
+        return placements
+
+    def _place_ship_randomly(self, board, ship):
+        placed = False
+        attempts = 0
+        while not placed and attempts < 1000:
+            row = random.randint(0, GRID_SIZE - 1)
+            col = random.randint(0, GRID_SIZE - 1)
+            orientation = random.randint(0, ORIENTATION_COUNT - 1)
+            if board.place_ship(ship, row, col, orientation):
+                placed = True
+            attempts += 1
+
+    def _occupied_ship_cells(self, board):
+        return [
+            (row_idx, col_idx)
+            for row_idx, row in enumerate(board.grid)
+            for col_idx, cell in enumerate(row)
+            if cell.has_ship()
+        ]
 
     def register_sonar_findings(self, found_positions):
         for pos in found_positions:

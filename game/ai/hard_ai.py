@@ -1,4 +1,4 @@
-"""Schwere KI, Logik für abilities und angepasstes Suchraster"""
+"""Schwere KI. Logik für abilities, angepasstes Suchraster, Placement logik"""
 
 import random
 from game.config import GRID_SIZE
@@ -6,6 +6,79 @@ from game.ai.normal_ai import NormalComputerAI
 
 
 class HardComputerAI(NormalComputerAI):
+    def __init__(self):
+        super().__init__()
+        self.hide_small_ship_remaining = 0
+
+    def place_ships(self, board):
+        # Nicht jedes Spiel gleich: kleines Schiff nur manchmal bewusst verstecken.
+        self.hide_small_ship_remaining = 1 if random.random() < 0.35 else 0
+        super().place_ships(board)
+
+    def _choose_ship_placement(self, board, ship):
+        placements = self._collect_possible_placements(board, ship)
+        if not placements:
+            return None
+
+        occupied_cells = self._occupied_ship_cells(board)
+        if not occupied_cells:
+            return random.choice(placements)
+
+        spread_weight = random.uniform(2.2, 3.4)
+        edge_weight = random.uniform(2.8, 4.2)
+        noise = random.uniform(1.0, 2.0)
+        hide_weight = random.uniform(1.1, 1.9)
+
+        scored = []
+        for row, col, orientation in placements:
+            coordinates = ship.get_coordinates_at(row, col, orientation)
+            score = spread_weight * self._distance_to_other_ships(coordinates, occupied_cells)
+            score += edge_weight * self._distance_to_edge(coordinates)
+
+            if self.hide_small_ship_remaining > 0 and ship.get_size() <= 3:
+                score += hide_weight * self._small_ship_hide_bonus(coordinates, occupied_cells)
+
+            score += random.uniform(-noise, noise)
+            scored.append((score, row, col, orientation))
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        top_pool_size = min(max(4, len(scored) // 5), len(scored))
+        top_pool = scored[:top_pool_size]
+        chosen = random.choice(top_pool)
+        chosen_coords = ship.get_coordinates_at(chosen[1], chosen[2], chosen[3])
+
+        if self.hide_small_ship_remaining > 0 and ship.get_size() <= 3:
+            if self._small_ship_hide_bonus(chosen_coords, occupied_cells) > 0.2:
+                self.hide_small_ship_remaining -= 1
+
+        return chosen[1], chosen[2], chosen[3]
+
+    def _distance_to_edge(self, coordinates):
+        edge_distances = [
+            min(row, col, GRID_SIZE - 1 - row, GRID_SIZE - 1 - col)
+            for row, col in coordinates
+        ]
+        return sum(edge_distances) / max(1, len(edge_distances))
+
+    def _small_ship_hide_bonus(self, coordinates, occupied_cells):
+        if not occupied_cells:
+            return 0.0
+
+        near_edge_cells = sum(
+            1
+            for row, col in coordinates
+            if min(row, col, GRID_SIZE - 1 - row, GRID_SIZE - 1 - col) <= 1
+        )
+        nearest = min(
+            abs(row - other_row) + abs(col - other_col)
+            for row, col in coordinates
+            for other_row, other_col in occupied_cells
+        )
+
+        edge_factor = near_edge_cells / max(1, len(coordinates))
+        near_ship_factor = max(0.0, 4.0 - nearest) / 4.0
+        return edge_factor + near_ship_factor
+
     def choose_action(self, board):
         # Guided missile zum finden neuer targets einsetzen
         if self.abilities["guided"] > 0 and self._should_use_guided(board):
