@@ -11,6 +11,14 @@ from game.states.shared_placement import SharedPlacementState
 from game.theme import theme_manager
 
 
+NAPALM_IMMUNE_BASE_NAMES = {"U-Boot", "Schaluppe"}
+
+
+def _base_ship_name(name: str) -> str:
+    # "U-Boot #1" -> "U-Boot"
+    return (name or "").split(" #", 1)[0].strip()
+
+
 class MultiplayerPlacementState(SharedPlacementState):
 
     title_text = "MULTIPLAYER - SCHIFFE PLATZIEREN"
@@ -24,7 +32,6 @@ class MultiplayerPlacementState(SharedPlacementState):
         self.ws.start()
         self.game_manager.ws = self.ws
 
-
         # Multiplayer UI / State
         self.local_ready_sent = False
         self.toast_text = ""
@@ -37,18 +44,20 @@ class MultiplayerPlacementState(SharedPlacementState):
         # Buttons
         self.ready_button = self.build_primary_action_button("BEREIT", self._on_ready_clicked, 30)
 
+        # Optional: nur sinnvoll, wenn Server diese Nachricht auch verarbeitet
         if self.host:
             self.ws.send_json({"type": "host_name", "name": mconfig.NAME})
-
-
 
     # ------------------------------
     # Button clicked
     # ------------------------------
     def _send_board_to_server_once(self):
         """
-        Sendet die eigenen Schiffszellen an den Server:
-        {"type":"set_board","ships":[ [[row,col],...], ... ]}
+        Sendet die eigenen Schiffszellen an den Server.
+
+        WICHTIG: Damit Napalm U-Boote NICHT zerstören kann, muss der Server wissen,
+        welche Schiffe immune sind. Daher senden wir pro Schiff Meta:
+          {"name": "...", "immune_to_napalm": bool, "cells":[[row,col],...]}
         """
         if self.board_sent:
             return
@@ -57,7 +66,12 @@ class MultiplayerPlacementState(SharedPlacementState):
 
         ships_payload = []
         for ship in self.player_board.ships:
-            ships_payload.append([[cell.row, cell.col] for cell in ship.cells])
+            base_name = _base_ship_name(ship.name)
+            ships_payload.append({
+                "name": base_name,
+                "immune_to_napalm": base_name in NAPALM_IMMUNE_BASE_NAMES,
+                "cells": [[cell.row, cell.col] for cell in ship.cells],
+            })
 
         self.ws.send_json({"type": "set_board", "ships": ships_payload})
         self.board_sent = True
@@ -88,14 +102,12 @@ class MultiplayerPlacementState(SharedPlacementState):
         if self.ready_button.is_hovered(pos[0], pos[1]):
             self.ready_button.click()
 
-
     # ------------------------------
     # Graphics
     # ------------------------------
     def _show_toast(self, text: str, duration: float = 2.0):
         self.toast_text = text
         self.toast_timer = duration
-
 
     # ------------------------------
     # websocket
@@ -109,7 +121,6 @@ class MultiplayerPlacementState(SharedPlacementState):
             t = msg.get("type")
 
             if t == "presence":
-                # Gegnername aus host_name/guest_name
                 opponent = (msg.get("guest_name") if self.host else msg.get("host_name")) or None
                 print(f"Gegner: {msg}")
                 if opponent:
@@ -121,7 +132,6 @@ class MultiplayerPlacementState(SharedPlacementState):
                 mconfig.set_game(opponent_name=opponent, ready=ready)
 
             elif t == "game_started":
-                # turn speichern, damit Battle sofort Turn kennt
                 turn = msg.get("turn")  # "host"/"guest"
                 self.game_manager.mp_turn = turn
 
@@ -135,7 +145,6 @@ class MultiplayerPlacementState(SharedPlacementState):
             elif t == "error":
                 self._show_toast(msg.get("detail", "Server error"))
 
-
     # ------------------------------
     # Update
     # ------------------------------
@@ -146,7 +155,6 @@ class MultiplayerPlacementState(SharedPlacementState):
             if self.toast_timer <= 0:
                 self.toast_text = ""
         super().update(dt, mouse_pos)
-
 
     # ------------------------------
     # Draw
