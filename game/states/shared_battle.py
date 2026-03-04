@@ -108,6 +108,7 @@ class SharedBattleState(BaseState):
         }
         self.message = label.get(name, "SPEZIALFÄHIGKEIT AKTIV")
 
+
     def _toggle_player_marker(self, pos):
         board = self._get_enemy_board()
         if not board:

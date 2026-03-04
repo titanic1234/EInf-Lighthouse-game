@@ -35,6 +35,9 @@ class MultiplayerBattleState(SharedBattleState):
         self.winner = None
         self.message = "WAITING FOR GAME START..."
 
+        self.game_over_timer = None
+        self.game_over_delay = config.BATTLE_GAME_OVER_DELAY
+
         initial_turn = getattr(self.game_manager, "mp_turn", None)
         if isinstance(initial_turn, str) and initial_turn in ("host", "guest"):
             self._set_turn(initial_turn)
@@ -271,7 +274,7 @@ class MultiplayerBattleState(SharedBattleState):
         if isinstance(winner, str) and winner in ("host", "guest"):
             self.game_manager.winner = "Player" if winner == self.role else "Opponent"
             mconfig.set_game(winner=winner)
-        self.game_manager.change_state(config.STATE_GAME_OVER)
+        self.game_over_timer = self.game_over_delay
 
     def _process_ws_messages(self):
         while True:
@@ -320,6 +323,10 @@ class MultiplayerBattleState(SharedBattleState):
     # ------------------------------
 
     def _update_pipeline(self, dt, mouse_pos):
+        if self.game_over_timer is not None:
+            self.game_over_timer -= dt
+            if self.game_over_timer <= 0:
+                self.game_manager.change_state(config.STATE_GAME_OVER)
         self.particles.update(dt)
         self._process_ws_messages()
 
