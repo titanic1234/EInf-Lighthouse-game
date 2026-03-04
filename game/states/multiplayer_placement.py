@@ -138,6 +138,9 @@ class MultiplayerPlacementState(SharedPlacementState):
                 self.game_manager.change_state(config.STATE_MULTIPLAYER_GAME)
                 return
 
+            elif t == "host_name":
+                pass
+
             elif t == "error":
                 self._show_toast(msg.get("detail", "Server error"))
 
