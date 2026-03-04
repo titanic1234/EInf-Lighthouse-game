@@ -17,7 +17,7 @@ class JoinGameState(MultiplayerLobbyState):
         super().__init__(game_manager)
 
         # ---- Field State ----
-        self.room_locked = False
+        self.room_locked = False # nicht gesperrt: kann bearbeitet werden
 
         self.toast_text = ""
         self.toast_timer = 0.0
@@ -36,7 +36,6 @@ class JoinGameState(MultiplayerLobbyState):
             self.game_manager.change_state(config.STATE_MULTIPLAYER_PLACEMENT)
 
         else:
-            # TODO: Fehlermeldung anzeigen
             text = f"Fehler beim Join: {fehler}"
             self._show_toast(text)
             self.game_manager.change_state(config.STATE_MULTIPLAYER_MENU)

@@ -1,5 +1,7 @@
+# multiplayer_config.py
+
 """
-Multiplayer Config
+Alle Variablen für den Multiplayer-Modus mit Funktionen zum dynamischen Ändern der Variablen.
 """
 
 MULTIPLAYER_SERVER_URL = "http://46.224.135.187:8000/"

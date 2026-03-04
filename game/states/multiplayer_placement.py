@@ -1,4 +1,5 @@
 # multiplayer_placement.py
+
 """Schiffsplatzierung (Multiplayer)"""
 
 from pgzero.rect import Rect
@@ -49,7 +50,7 @@ class MultiplayerPlacementState(SharedPlacementState):
             self.ws.send_json({"type": "host_name", "name": mconfig.NAME})
 
     # ------------------------------
-    # Button clicked
+    # Button clicked / handle click
     # ------------------------------
     def _send_board_to_server_once(self):
         """
@@ -86,7 +87,6 @@ class MultiplayerPlacementState(SharedPlacementState):
             self._show_toast("Keine Verbindung zum Server.")
             return
 
-        # ✅ wichtig: erst Board senden, dann ready
         self._send_board_to_server_once()
 
         self.local_ready_sent = True
@@ -97,6 +97,7 @@ class MultiplayerPlacementState(SharedPlacementState):
         if self.ready_button.is_hovered(pos[0], pos[1]):
             self.ready_button.click()
 
+
     # ------------------------------
     # Graphics
     # ------------------------------
@@ -104,8 +105,9 @@ class MultiplayerPlacementState(SharedPlacementState):
         self.toast_text = text
         self.toast_timer = duration
 
+
     # ------------------------------
-    # websocket
+    # websocket processing
     # ------------------------------
     def _process_ws_messages(self):
         while True:
@@ -115,32 +117,34 @@ class MultiplayerPlacementState(SharedPlacementState):
 
             t = msg.get("type")
 
-            if t == "presence":
-                opponent = (msg.get("guest_name") if self.host else msg.get("host_name")) or None
-                if opponent:
-                    mconfig.set_game(opponent_name=opponent)
+            match t:
+                case "presence":
+                    opponent = (msg.get("guest_name") if self.host else msg.get("host_name")) or None
+                    if opponent:
+                        mconfig.set_game(opponent_name=opponent)
 
-            elif t == "ready_update":
-                ready = bool(msg.get("guest_ready")) and bool(msg.get("host_ready"))
-                opponent = (msg.get("guest_name") if self.host else msg.get("host_name")) or None
-                mconfig.set_game(opponent_name=opponent, ready=ready)
+                case "ready_update":
+                    ready = bool(msg.get("guest_ready")) and bool(msg.get("host_ready"))
+                    opponent = (msg.get("guest_name") if self.host else msg.get("host_name")) or None
+                    mconfig.set_game(opponent_name=opponent, ready=ready)
 
-            elif t == "game_started":
-                turn = msg.get("turn")  # "host"/"guest"
-                self.game_manager.mp_turn = turn
+                case "game_started":
+                    turn = msg.get("turn")  # "host"/"guest"
+                    self.game_manager.mp_turn = turn
 
-                # Board + WS in GameManager speichern
-                self.game_manager.player_board = self.player_board
-                self.game_manager.ws = self.ws
+                    # Board + WS in GameManager speichern
+                    self.game_manager.player_board = self.player_board
+                    self.game_manager.ws = self.ws
 
-                self.game_manager.change_state(config.STATE_MULTIPLAYER_GAME)
-                return
+                    self.game_manager.change_state(config.STATE_MULTIPLAYER_GAME)
+                    return
 
-            elif t == "host_name":
-                pass
+                case "host_name":
+                    pass
 
-            elif t == "error":
-                self._show_toast(msg.get("detail", "Server error"))
+                case "error":
+                    self._show_toast(msg.get("detail", "Server error"))
+
 
     # ------------------------------
     # Update
@@ -152,6 +156,7 @@ class MultiplayerPlacementState(SharedPlacementState):
             if self.toast_timer <= 0:
                 self.toast_text = ""
         super().update(dt, mouse_pos)
+
 
     # ------------------------------
     # Draw

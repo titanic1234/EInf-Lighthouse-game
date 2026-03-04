@@ -1,19 +1,15 @@
+# communication.py
+
 import threading
 import time
 import requests
-import websocket  # pip install websocket-client
-import json
-from queue import Queue, Empty
 from game.theme import theme_manager
-
-from game.multiplayer.schemas import *
-from game.multiplayer.multiplayer_config import MULTIPLAYER_SERVER_URL
 import game.multiplayer.multiplayer_config as mconfig
-import game.config as config
+
 
 
 def _check_connection_loop():
-    """Connects to the multiplayer server and returns True if successful, False otherwise."""
+    """Im Thread laufende Loop zum testen der Serververbindung. Kann teils abgeschaltet werden mit mconfig.CHECK_CONNECTION = False."""
     while True:
         if mconfig.CHECK_CONNECTION:
             try:
@@ -26,7 +22,7 @@ def _check_connection_loop():
 
 
 def _start_check_connection_thread():
-    """Starts a thread to check the connection status with the multiplayer server."""
+    """Startet einen Thread zum testen der Serververbindung."""
     if mconfig.CHECK_CONNECTION_ACTIVE:
         return
     mconfig.check_connection(check=True)
@@ -36,15 +32,15 @@ def _start_check_connection_thread():
 
 
 def create_game():
-    """Creates a new game on the multiplayer server."""
+    """Schicke eine create game request an den multiplayer Server und speichert den Gamecode und den Player-Token in mconfig."""
     response = requests.post(mconfig.MULTIPLAYER_SERVER_URL + "games", json={"theme": theme_manager.get_theme()})
     response = response.json()
     mconfig.change_vars(code=response["code"], player_token=response["player_token"], role=response["role"])
 
 
 def join_game(code: str, name: str):
-    """Joins an existing game on the multiplayer server."""
-    response = requests.post(mconfig.MULTIPLAYER_SERVER_URL + "games/join/", json={"code": code, "name": name})
+    """Schickt eine join game request an den multiplayer Server mit dem Gamecode aus mconfig und speichert den Player-Token in mconfig. Setzt außerdem das Theme = theme vom host."""
+    response = requests.post(mconfig.MULTIPLAYER_SERVER_URL + "games/join", json={"code": code, "name": name})
     if 400 <= response.status_code <= 404:
         return response.status_code
     response = response.json()
