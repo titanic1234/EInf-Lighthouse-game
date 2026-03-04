@@ -282,7 +282,7 @@ class MultiplayerLobbyState(BaseState):
         screen.blit(surf, (rect.x + 16, rect.centery - surf.get_height() // 2))
 
         if focused and (not locked) and (int(self.cursor_t * 2) % 2 == 0):
-            cx = rect.x + 16 + min(rect.w - 32, 12 * len(value))
+            cx = rect.x + 22 + min(rect.w - 28, 14 * len(value))
             pygame.draw.line(screen, text_col, (cx, rect.y + 10), (cx, rect.bottom - 10), 2)
 
     def draw(self, screen):
