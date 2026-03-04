@@ -54,10 +54,6 @@ class MultiplayerPlacementState(SharedPlacementState):
     def _send_board_to_server_once(self):
         """
         Sendet die eigenen Schiffszellen an den Server.
-
-        WICHTIG: Damit Napalm U-Boote NICHT zerstören kann, muss der Server wissen,
-        welche Schiffe immune sind. Daher senden wir pro Schiff Meta:
-          {"name": "...", "immune_to_napalm": bool, "cells":[[row,col],...]}
         """
         if self.board_sent:
             return
