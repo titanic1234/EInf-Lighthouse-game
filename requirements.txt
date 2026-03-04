@@ -1,3 +1,4 @@
+pygame
 pgzero
 pillow
 pydantic
