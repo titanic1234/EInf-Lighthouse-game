@@ -103,15 +103,12 @@ class WSClient:
         while True:
             try:
                 raw = self._outgoing.get_nowait()
-                print("Senden: ", raw, end="")
             except Empty as error:
                 break
             try:
                 self._ws.send(raw)
-                print("Gesendet: ", raw, end="")
             except Exception as error:
                 print(f"Fehler beim Senden: {error}")
-                # wenn senden fehlschlägt, abbrechen (disconnect handled elsewhere)
                 break
 
     def _run(self):

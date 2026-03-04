@@ -156,6 +156,12 @@ class ThemeManager:
         display_name = self.current.ship_name_overrides.get(base_name, base_name)
         return f"{display_name}{suffix}"
 
+    def set_theme(self, theme_name):
+        self.current.name = theme_name
+
+    def get_theme(self):
+        return self.current.name
+
 
 # Globale Instanz
 theme_manager = ThemeManager()

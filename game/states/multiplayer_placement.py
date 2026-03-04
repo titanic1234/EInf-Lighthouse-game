@@ -79,7 +79,6 @@ class MultiplayerPlacementState(SharedPlacementState):
         self.ws.send_json({"type": "ready"})
 
     def _on_ready_clicked(self):
-        print("READY CLICKED")
         if not self._all_ships_placed():
             self._show_toast("Platziere zuerst alle Schiffe!")
             return
@@ -118,7 +117,6 @@ class MultiplayerPlacementState(SharedPlacementState):
 
             if t == "presence":
                 opponent = (msg.get("guest_name") if self.host else msg.get("host_name")) or None
-                print(f"Gegner: {msg}")
                 if opponent:
                     mconfig.set_game(opponent_name=opponent)
 

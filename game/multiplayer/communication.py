@@ -4,6 +4,7 @@ import requests
 import websocket  # pip install websocket-client
 import json
 from queue import Queue, Empty
+from game.theme import theme_manager
 
 from game.multiplayer.schemas import *
 from game.multiplayer.multiplayer_config import MULTIPLAYER_SERVER_URL
@@ -36,7 +37,7 @@ def _start_check_connection_thread():
 
 def create_game():
     """Creates a new game on the multiplayer server."""
-    response = requests.post(mconfig.MULTIPLAYER_SERVER_URL + "games")
+    response = requests.post(mconfig.MULTIPLAYER_SERVER_URL + "games", json={"theme": theme_manager.get_theme()})
     response = response.json()
     mconfig.change_vars(code=response["code"], player_token=response["player_token"], role=response["role"])
 
@@ -47,7 +48,6 @@ def join_game(code: str, name: str):
     if 400 <= response.status_code <= 404:
         return response.status_code
     response = response.json()
-    print(response)
-    print(response["player_token"])
+    theme_manager.set_theme(response["theme"])
     mconfig.change_vars(code=code, player_token=response["player_token"], role=response["role"], name=name)
     return None
