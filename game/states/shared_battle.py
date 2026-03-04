@@ -95,6 +95,11 @@ class SharedBattleState(BaseState):
             self._use_guided_missile()
             return
 
+        if self.selected_ability == name:
+            self.selected_ability = None
+            self.message = f"{self._ability_display_name(name)} DEAKTIVIERT"
+            return
+
         self.selected_ability = name
         label = {
             "airstrike": f"{self._ability_display_name('airstrike')} AKTIV (+)",
