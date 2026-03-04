@@ -56,6 +56,8 @@ class MultiplayerBattleState(SharedBattleState):
         if not cell or cell.is_shot():
             return
 
+
+
         cell.scan_marked = False
         cell.scan_found_ship = False
         cell.player_marker = False
@@ -89,7 +91,6 @@ class MultiplayerBattleState(SharedBattleState):
 
         if napalm and napalm_only:
             cell.napalm_marked = True
-            # Optional Partikel: "splash" als Feuer-Spread
             self._spawn_effects(self.player_board, row, col, False)
             return
 
@@ -156,12 +157,10 @@ class MultiplayerBattleState(SharedBattleState):
                     continue
 
                 if by == self.role:
-                    # ✅ Napalm-only darf KEIN HIT/MISS setzen -> sonst wird es "shot" und blockiert weitere Schüsse
                     if napalm_only:
                         cell = self.opponent_board.get_cell(row, col)
                         if cell:
                             cell.napalm_marked = True
-                        # Optional Effekt:
                         self._spawn_effects(self.opponent_board, row, col, False)
                     else:
                         self._mark_opponent_cell(row, col, hit, keep_napalm=True)
@@ -211,7 +210,7 @@ class MultiplayerBattleState(SharedBattleState):
                 r, c = rc
                 if not isinstance(r, int) or not isinstance(c, int):
                     continue
-                cell = self.opponent_board.get_cell(r, c)
+                cell = self.opponent_board.get_cell(r, c) if msg.get("by") == self.role else self.player_board.get_cell(r, c)
                 if cell and not cell.is_shot():
                     cell.scan_marked = True
                     cell.scan_found_ship = (r, c) in found
@@ -252,7 +251,6 @@ class MultiplayerBattleState(SharedBattleState):
                 if cell:
                     cell.napalm_marked = True
 
-                # ✅ nur wenn es ein echter shot war (napalm_only=False), setzen wir HIT/MISS
                 if not napalm_only:
                     self._mark_opponent_cell(row, col, hit, keep_napalm=True)
 
