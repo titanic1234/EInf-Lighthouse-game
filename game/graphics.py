@@ -22,6 +22,7 @@ _THEME_STATUS_ICON_MAP = {
 _STATUS_ICON_CACHE = {}
 _UI_SPRITE_CACHE = {}
 
+#sprite img files zuordnen
 _THEME_UI_SPRITE_MAP = {
     "MODERN": {
         "water": "ui_modern_water_cell.png",
@@ -32,6 +33,7 @@ _THEME_UI_SPRITE_MAP = {
         "scan": "ui_generic_scan.png",
         "scan_found": "ui_generic_scan_found.png",
         "player_marker": "ui_generic_player_marker.png",
+        "napalm": "napalm.png",
         "title_art": "ui_modern_title_art.png",
     },
     "PIRATE": {
@@ -43,12 +45,14 @@ _THEME_UI_SPRITE_MAP = {
         "scan": "ui_generic_scan.png",
         "scan_found": "ui_generic_scan_found.png",
         "player_marker": "ui_generic_player_marker.png",
+        "napalm": "griechisches_feuer.png",
         "title_art": "ui_pirate_title_art.png",
     },
 }
 
 
 def _get_ui_sprite(sprite_name):
+    # lädt UI img theme spezifisch, added img zu cache bei 1. load (cache logik via AI-chatbot)
     theme_name = theme_manager.current.name
     theme_filename = _THEME_UI_SPRITE_MAP.get(theme_name, {}).get(sprite_name)
 
@@ -73,7 +77,7 @@ def _get_ui_sprite(sprite_name):
 
 
 def scale_sprite_to_cell(sprite_surface, cell_size, fill_ratio=1.0):
-    """Skaliert ein Sprite proportional auf die Zellgröße und erhält das Seitenverhältnis."""
+    # passt sprite auf board an, seitenverhältnis gleich
     if sprite_surface is None:
         return None
 
@@ -91,23 +95,22 @@ def scale_sprite_to_cell(sprite_surface, cell_size, fill_ratio=1.0):
     return pygame.transform.smoothscale(sprite_surface, (scaled_w, scaled_h))
 
 def _get_status_icon(icon_name):
+    # lädt theme speziefisches ability icon, cached beim 1. mal (cache logik via AI-chatbot)
     theme_name = theme_manager.current.name
     theme_filename = _THEME_STATUS_ICON_MAP.get(theme_name, {}).get(icon_name)
-    generic_filename = f"ui_generic_{icon_name}.png"
 
-    for filename in (theme_filename, generic_filename):
-        if not filename:
-            continue
+    if not theme_filename:
+        return None
 
-        cache_key = ("status", filename)
-        if cache_key not in _STATUS_ICON_CACHE:
-            icon_path = os.path.join("images", filename)
-            if not os.path.exists(icon_path):
-                continue
-            try:
-                _STATUS_ICON_CACHE[cache_key] = pygame.image.load(icon_path).convert_alpha()
-            except pygame.error:
-                continue
+    cache_key = ("status", theme_filename)
+    if cache_key not in _STATUS_ICON_CACHE:
+        icon_path = os.path.join("images", theme_filename)
+        if not os.path.exists(icon_path):
+            return None
+        try:
+            _STATUS_ICON_CACHE[cache_key] = pygame.image.load(icon_path).convert_alpha()
+        except pygame.error:
+            return None
 
         icon_surface = _STATUS_ICON_CACHE.get(cache_key)
         if icon_surface is not None:
@@ -134,11 +137,13 @@ _THEME_SHIP_IMAGE_MAP = {
 
 
 def _normalize_ship_name(ship_name):
+    # returned name des ship typs
     base_name = ship_name.split(" #", 1)[0]
     return base_name.replace("ae", "ä").replace("oe", "ö").replace("ue", "ü")
 
 
 def _get_ship_image(theme_name, ship_name):
+    #lädt das dem ship+theme zugeordnete img, cached es beim 1. mal (cache logik via AI-chatbot)
     normalized_name = _normalize_ship_name(ship_name)
     file_name = _THEME_SHIP_IMAGE_MAP.get(theme_name, {}).get(normalized_name)
     if not file_name:
@@ -155,6 +160,7 @@ def _get_ship_image(theme_name, ship_name):
 
 
 def _draw_ship_cell_image(screen, x, y, cell):
+    # berechnet ausschnitt des ship img der in dem feld liegt
     if not cell.has_ship():
         return False
 
@@ -197,6 +203,7 @@ def _draw_ship_cell_image(screen, x, y, cell):
 
 
 def _get_transformed_ship_surface(ship, grid_width, grid_height, orientation, ship_coords=None):
+    #rotation und warp der ship-sprites
     source_image = _get_ship_image(theme_manager.current.name, ship.name)
     if source_image is None:
         return None
@@ -223,6 +230,7 @@ def _get_transformed_ship_surface(ship, grid_width, grid_height, orientation, sh
         target_height = grid_height * config.CELL_SIZE
         source_width, source_height = rotated.get_size()
 
+        # scaled 1 seite auf 100% und die andere auf min 50%
         min_breadth = max(1, config.CELL_SIZE // 2)
         if target_width >= target_height:
             scaled_width = target_width
@@ -237,8 +245,10 @@ def _get_transformed_ship_surface(ship, grid_width, grid_height, orientation, sh
         transformed = pygame.Surface((target_width, target_height), pygame.SRCALPHA)
         offset_x = (target_width - scaled_width) // 2
         offset_y = (target_height - scaled_height) // 2
+        # special alignment für flugzeugträger da 2 breit
         if ship.shape == "carrier_l":
             coords = ship_coords if ship_coords else ship.get_coordinates_at(0, 0, orientation)
+            #calc coords für mittiges feld
             min_row = min(r for r, _ in coords)
             min_col = min(c for _, c in coords)
             local_rows = [r - min_row for r, _ in coords]
@@ -246,6 +256,7 @@ def _get_transformed_ship_surface(ship, grid_width, grid_height, orientation, sh
             avg_row = sum(local_rows) / len(local_rows)
             avg_col = sum(local_cols) / len(local_cols)
 
+            #diff zwischen mittigem feld und geometrischer Mitte in px
             row_bias_px = int(round(((avg_row + 0.5) - (grid_height / 2)) * config.CELL_SIZE))
             col_bias_px = int(round(((avg_col + 0.5) - (grid_width / 2)) * config.CELL_SIZE))
 
@@ -262,7 +273,7 @@ def _get_transformed_ship_surface(ship, grid_width, grid_height, orientation, sh
 
 
 def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True, ws_connected: bool = False):
-    """Zeichnet eine Zelle als sprite"""
+    # handlet sprites für das Feld
     theme = theme_manager.current
     cell_rect = pygame.Rect(x, y, config.CELL_SIZE, config.CELL_SIZE)
 
@@ -271,7 +282,7 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True, ws_conne
         water_scaled = pygame.transform.smoothscale(water_sprite, (config.CELL_SIZE, config.CELL_SIZE))
         screen.blit(water_scaled, cell_rect)
 
-    # Zeige enemy ship png nur bei schon zerstörten Schiffen
+    # zeige enemy ship png nur bei schon zerstörten Schiffen
     should_show_ship = (
         cell.has_ship()
         and ((show_ships and not is_enemy) or (is_enemy and (show_ships or cell.status == config.CELL_DESTROYED)))
@@ -281,7 +292,7 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True, ws_conne
     grid_color = theme.color_grid_player if not is_enemy else theme.color_grid_enemy
     pygame.draw.rect(screen, grid_color, cell_rect, 1)
 
-    # Schiff
+    # draw ausschnitt von ship sprite der in dem Feld liegt
     if should_show_ship:
         ship_image_drawn = _draw_ship_cell_image(screen, x, y, cell)
         if not ship_image_drawn:
@@ -289,6 +300,8 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True, ws_conne
             if ship_fallback:
                 ship_scaled = pygame.transform.smoothscale(ship_fallback, (config.CELL_SIZE, config.CELL_SIZE))
                 screen.blit(ship_scaled, cell_rect)
+
+    # UI marker
 
     if cell.scan_marked and not cell.is_shot():
         scan_name = "scan_found" if cell.scan_found_ship else "scan"
@@ -309,7 +322,6 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True, ws_conne
             marker_scaled = scale_sprite_to_cell(marker_sprite, config.CELL_SIZE, fill_ratio=0.62)
             screen.blit(marker_scaled, marker_scaled.get_rect(center=cell_rect.center))
 
-        # Hit/Miss
     if cell.status == config.CELL_HIT:
         hit_sprite = _get_ui_sprite("hit")
         if hit_sprite:
@@ -328,7 +340,7 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True, ws_conne
 
 
 def draw_title_art(screen):
-    """Zeichnet Artwork Sprite für menü"""
+    # lädt menübild des themes
     center_x = config.WINDOW_WIDTH // 2
     title_sprite = _get_ui_sprite("title_art")
     if not title_sprite:
@@ -338,7 +350,7 @@ def draw_title_art(screen):
     scale_factor = target_w / max(1, title_sprite.get_width())
     target_h = max(1, int(title_sprite.get_height() * scale_factor))
     scaled = pygame.transform.smoothscale(title_sprite, (target_w, target_h))
-    # Positioning zwischen Titel und Button-Zeile.
+    # zwischen Titel und buttons.
     max_bottom = config.MENU_BUTTON_Y - 35
     target_center_y = (config.MENU_SUBTITLE_Y + max_bottom) // 2
     rect = scaled.get_rect(center=(center_x, target_center_y))
@@ -348,7 +360,6 @@ def draw_title_art(screen):
 
 
 def draw_text(surface, text, x, y, font_size, color, center=False):
-    """Zeichnet Text auf eine Surface mit reinen Pygame-Funktionen."""
     font = pygame.font.Font(None, font_size)
     text_surf = font.render(text, True, color)
     if center:
@@ -361,14 +372,13 @@ def draw_text(surface, text, x, y, font_size, color, center=False):
 # Create reusable procedural graphics
 
 def draw_gradient_background(screen_surface, time_value=0.0):
-    """Draws a vertical gradient background with procedural water caustics."""
+    #animierter Hintergtrund via AI-chatbot
     height = config.WINDOW_HEIGHT
     width = config.WINDOW_WIDTH
     theme = theme_manager.current
     color_top = theme.color_bg_top
     color_bottom = theme.color_bg_bottom
 
-    # Introduce a slight color shift based on time for an "underwater" or "rippling" feel
     shift_r = int(math.sin(time_value * 2.0) * 10)
     shift_g = int(math.cos(time_value * 1.5) * 10)
     shift_b = int(math.sin(time_value * 1.0) * 15)
@@ -393,23 +403,18 @@ def draw_gradient_background(screen_surface, time_value=0.0):
     gradient_surface = pygame.transform.scale(gradient_surface, (width, height))
     screen_surface.blit(gradient_surface, (0, 0))
 
-    # Draw soft light reflections (Caustics simulation)
-    # Using larger lines that move vertically
     if time_value > 0:
         caustic_surface = pygame.Surface((width, height), pygame.SRCALPHA)
         for i in range(4):
-            # Calculate position moving from top to bottom
             y_base = (time_value * 40 + i * (height / 4)) % height
-            # Oscillate alpha
             alpha = int((math.sin(time_value * 2 + i) * 0.5 + 0.5) * 15)
-            # Draw semi transparent thick horizontal band
             pygame.draw.rect(caustic_surface, (150, 200, 255, alpha), (0, y_base - 20, width, 40))
 
         screen_surface.blit(caustic_surface, (0, 0))
 
 
 def draw_rounded_rect(surface, color, rect, radius=10, width=0, alpha=255):
-    """Draws a rounded rect with optional alpha transparency."""
+    # generiert abgerrundetes rechteck
     if alpha < 255:
         shape_surf = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
         pygame.draw.rect(shape_surf, (*color, alpha), shape_surf.get_rect(), border_radius=radius, width=width)
@@ -424,6 +429,7 @@ class GlowButton(BaseButton):
         self.hover_progress = 0.0  # Für weiche Übergänge
 
     def update(self, dt, mouse_x, mouse_y):
+
         super().update(dt, mouse_x, mouse_y)
         if self.hovered:
             self.hover_progress = min(1.0, self.hover_progress + dt * 6.0)
@@ -438,24 +444,24 @@ class GlowButton(BaseButton):
 
         current_color = (r, g, b)
 
-        # Draw shadow
+        # schatten
         shadow_rect = self.rect.copy()
         shadow_rect.y += 4
         draw_rounded_rect(screen_surface, (0, 0, 0), shadow_rect, radius=12, alpha=100)
 
-        # Draw button
+        # button
         draw_rounded_rect(screen_surface, current_color, self.rect, radius=12)
 
-        # Draw border
+        # outline
         draw_rounded_rect(screen_surface, (100, 180, 255), self.rect, radius=12, width=2,
                           alpha=int(100 + 155 * self.hover_progress))
 
-        # Draw Text
+        # text
         font = pygame.font.Font(None, 36)
         text_surf = font.render(self.text, True, (255, 255, 255))
         text_rect = text_surf.get_rect(center=self.rect.center)
 
-        # Text shadow
+        # text schatten
         text_shadow = font.render(self.text, True, (0, 0, 0))
         text_shadow_rect = text_shadow.get_rect(center=(self.rect.centerx + 1, self.rect.centery + 1))
 
@@ -463,6 +469,7 @@ class GlowButton(BaseButton):
         screen_surface.blit(text_surf, text_rect)
 
 
+#particle animation via AI-chatbot
 class Particle:
     def __init__(self, x, y, color, velocity, life, size):
         self.x = x

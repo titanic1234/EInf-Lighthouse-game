@@ -154,7 +154,7 @@ class HardComputerAI(NormalComputerAI):
                 for r in range(row - 1, row + 2):
                     for c in range(col - 1, col + 2):
                         cell = board.get_cell(r, c)
-                        if cell and not cell.is_shot() and (r, c) not in self.tried_positions:
+                        if cell and not cell.is_shot():
                             score += 1
                 if score > best_score:
                     best = [(row, col)]
@@ -176,7 +176,7 @@ class HardComputerAI(NormalComputerAI):
                     cell = board.get_cell(r, c)
                     #score++ für jedes feld ohne info
                     if cell and not (cell.is_shot() or cell.napalm_marked or (r, c) in self.sonar_miss_positions
-                                     or (r, c) in self.known_ship_cells or (r, c) in self.tried_positions):
+                                     or (r, c) in self.known_ship_cells):
                         score += 1
                 if score > best_score:
                     best = [(row, col)]
@@ -186,7 +186,7 @@ class HardComputerAI(NormalComputerAI):
         return random.choice(best) if best else (random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1))
 
     def _best_hunt_cell(self, board):
-        # currently nur random non-napalm unbeschossenes feld
+        # currently nur random non-napalm, unbeschossenes feld
         candidates = [
             (r, c)
             for r, c in self._available_positions(board)

@@ -2,7 +2,6 @@ class Theme:
     def __init__(self, name):
         self.name = name
 
-        # Colors
         self.color_bg_top = (0, 0, 0)
         self.color_bg_bottom = (0, 0, 0)
         self.color_water = (0, 0, 0)
@@ -19,7 +18,6 @@ class Theme:
         self.color_particle_explosion = (0, 0, 0)
         self.color_particle_splash = (0, 0, 0)
 
-        # Strings
         self.text_title = ""
         self.text_subtitle = ""
         self.text_start_btn = ""
@@ -44,6 +42,8 @@ class Theme:
 class ModernTheme(Theme):
     def __init__(self):
         super().__init__("MODERN")
+
+        # theme farben (via KI-chatbot)
         self.color_bg_top = (15, 20, 35)
         self.color_bg_bottom = (5, 10, 20)
         self.color_water = (20, 40, 80)
@@ -61,6 +61,7 @@ class ModernTheme(Theme):
         self.color_particle_explosion = (255, 200, 50)
         self.color_particle_splash = (150, 200, 255)
 
+        # UI texte
         self.text_title = "SCHIFFE VERSENKEN"
         self.text_subtitle = "Operation Lighthouse"
         self.text_start_btn = "SPIEL STARTEN"
@@ -86,6 +87,8 @@ class ModernTheme(Theme):
 class PirateTheme(Theme):
     def __init__(self):
         super().__init__("PIRATE")
+
+        #theme farben (via KI-chatbot)
         self.color_bg_top = (80, 120, 140)
         self.color_bg_bottom = (30, 60, 80)
         self.color_water = (50, 100, 130)
@@ -103,6 +106,7 @@ class PirateTheme(Theme):
         self.color_particle_explosion = (255, 160, 0)
         self.color_particle_splash = (220, 240, 255)
 
+        #UI texte
         self.text_title = "PIRATEN SCHLACHT"
         self.text_subtitle = "KAMPF UM DIE SIEBEN WELTMEERE"
         self.text_start_btn = "HISST DIE SEGEL"
@@ -139,13 +143,14 @@ class ThemeManager:
         self.current = self.modern
 
     def toggle(self):
+        #theme switch
         if self.current.name == "MODERN":
             self.current = self.pirate
         else:
             self.current = self.modern
 
     def get_ship_display_name(self, ship_name):
-        """Liefert Schiffnamen für aktives Theme"""
+        #ship name für aktives theme
         suffix = ""
         base_name = ship_name
 
@@ -162,6 +167,4 @@ class ThemeManager:
     def get_theme(self):
         return self.current.name
 
-
-# Globale Instanz
 theme_manager = ThemeManager()

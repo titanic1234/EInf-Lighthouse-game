@@ -34,7 +34,7 @@ class MultiplayerBattleState(SharedBattleState):
         self.player_turn: bool = False
         self.game_over: bool = False
         self.winner = None
-        self.message = "WAITING FOR GAME START..."
+        self.message = "WARTE AUF SPIELBEGINN..."
 
         self.game_over_timer = None
         self.game_over_delay = config.BATTLE_GAME_OVER_DELAY
@@ -43,7 +43,7 @@ class MultiplayerBattleState(SharedBattleState):
         if isinstance(initial_turn, str) and initial_turn in ("host", "guest"):
             self._set_turn(initial_turn)
         else:
-            self.message = "WAITING FOR GAME START... (no turn)"
+            self.message = "WARTE AUF SPIELBEGINN... (kein zug)"
 
 
     # ------------------------------
@@ -130,13 +130,13 @@ class MultiplayerBattleState(SharedBattleState):
             self.game_manager.shots_hit += 1 if hit else 0
             if destroyed:
                 self._apply_destroyed_cells_on_opponent(destroyed_cells)
-                self.message = "SHIP DESTROYED!"
+                self.message = "SCHIFF ZERSTÖRT!"
             else:
-                self.message = "HIT!" if hit else "MISS!"
+                self.message = "TREFFER!" if hit else "VERFEHLT!"
         else:
             hit2, _, _ = self.player_board.shoot(row, col)
             self._spawn_effects(self.player_board, row, col, hit2)
-            self.message = "YOU WERE HIT!" if hit2 else "OPPONENT MISSED!"
+            self.message = "DU WURDEST GETROFFEN!" if hit2 else "GEGNER HAT VERFEHLT!"
 
         if isinstance(next_turn, str) and next_turn in ("host", "guest"):
             self._set_turn(next_turn)
@@ -221,7 +221,7 @@ class MultiplayerBattleState(SharedBattleState):
                     cell.scan_marked = True
                     cell.scan_found_ship = (r, c) in found
 
-        self.message = "SONAR COMPLETE"
+        self.message = "SONAR AUSGEFÜHRT"
 
 
     # ------------------------------
@@ -232,7 +232,7 @@ class MultiplayerBattleState(SharedBattleState):
         if not isinstance(results, list):
             return
 
-        self.message = "FIRE SPREADING..."
+        self.message = "FEUER BREITET SICH AUS..."
 
         for r in results:
             if not isinstance(r, dict):

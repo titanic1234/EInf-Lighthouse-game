@@ -115,6 +115,7 @@ class BattleState(SharedBattleState):
         self._check_game_over_after_player_action(hit)
 
     def _progress_fires(self):
+        # spread napalm zu 3 random nachbarfeldern
         if not self.active_fires:
             return False
 
@@ -219,6 +220,7 @@ class BattleState(SharedBattleState):
         self._check_game_over_after_player_action(False, force_end_turn=True, preserve_message=True)
 
     def _player_napalm(self, row, col):
+        # setzt 1 napalm feld mit spread
         self.abilities["napalm"]["charges"] = 0
         self.selected_ability = None
 
@@ -238,7 +240,7 @@ class BattleState(SharedBattleState):
         self._check_game_over_after_player_action(hit, force_end_turn=True, preserve_message=True)
 
     def _player_shoot(self, row, col):
-        """Spieler schiesst"""
+        #hit/miss
         theme = theme_manager.current
         cell = self.computer_board.get_cell(row, col)
 
@@ -281,7 +283,7 @@ class BattleState(SharedBattleState):
                 self.message = theme_manager.current.text_computer_turn
 
     def _end_game(self):
-        """Beendet das Spiel"""
+        # declared winner und setzt end-timer
         self.game_manager.winner = self.winner
         self.game_over_timer = self.game_over_delay
 
@@ -290,8 +292,8 @@ class BattleState(SharedBattleState):
     # Computer
     # ------------------------------
     def _computer_turn(self):
-        """Computer macht seinen Zug"""
-        fire_hit = self._progress_computer_fires()
+        #AI zugablauf, abilities, game over
+        self._progress_computer_fires()
         if self.player_board.all_ships_destroyed():
             self.game_over = True
             self.winner = "Computer"
@@ -305,32 +307,30 @@ class BattleState(SharedBattleState):
             row, col = action["row"], action["col"]
             found = self._computer_sonar(row, col)
             if found:
-                self.message = f"ENEMY SONAR DETECTED CONTACTS AT {len(found)} POSITIONS."
-            else:
-                self.message = "ENEMY SONAR: NO CONTACTS."
+                self.message = f"GEGNERISCHES SONAR HAT {len(found)} FELDER AUFGEDECKT."
             self.player_turn = True
-            self.message += " - YOUR TURN!"
+            self.message += " - DU BIST DRAN!"
             return
 
         if action_type == "airstrike":
             hit = self._computer_airstrike(action["row"], action["col"])
-            self.message = "ENEMY AIRSTRIKE HIT!" if hit else "ENEMY AIRSTRIKE MISSED."
+            self.message = "GEGNERISCHER LUFTANGRIFF TRIFFT" if hit else "GEGNERISCHER LUFTANGRIFF VERFEHLT."
             if not hit:
                 self.player_turn = True
-                self.message += " - YOUR TURN!"
+                self.message += " - DU BIST DRAN!"
         elif action_type == "guided":
             row, col, hit, destroyed, ship = self._computer_guided_missile()
-            self.message = self._computer_shot_message(row, col, hit, destroyed, ship, prefix="GUIDED")
+            self.message = self._computer_shot_message(row, col, hit, destroyed, ship, ability="LENKRAKETE")
             if not hit:
                 self.player_turn = True
-                self.message += " - YOUR TURN!"
+                self.message += " - DU BIST DRAN!"
         elif action_type == "napalm":
             row, col = action["row"], action["col"]
             hit, destroyed, ship = self._computer_napalm(row, col)
-            self.message = self._computer_shot_message(row, col, hit, destroyed, ship, prefix="NAPALM")
+            self.message = self._computer_shot_message(row, col, hit, destroyed, ship, ability="NAPALM")
             if not hit:
                 self.player_turn = True
-                self.message += " - YOUR TURN!"
+                self.message += " - DU BIST DRAN!"
         else:
             row, col = action["row"], action["col"]
             hit, destroyed, ship = self.player_board.shoot(row, col)
@@ -339,21 +339,22 @@ class BattleState(SharedBattleState):
             self.message = self._computer_shot_message(row, col, hit, destroyed, ship)
             if not hit:
                 self.player_turn = True
-                self.message += " - YOUR TURN!"
+                self.message += " - DU BIST DRAN!"
 
         if self.player_board.all_ships_destroyed():
             self.game_over = True
             self.winner = "Computer"
             self._end_game()
 
-    def _computer_shot_message(self, row, col, hit, destroyed, ship, prefix=None):
-        marker = f"{prefix} " if prefix else ""
+    def _computer_shot_message(self, row, col, hit, destroyed, ship, ability=None):
+        # generiert oben angezeigte info
+        marker = ability if ability else ""
         if hit:
             if destroyed and ship:
                 ship_name = theme_manager.get_ship_display_name(ship.name)
-                return f"ALERT: {marker}ALLY {ship_name.upper()} SUNK!"
-            return f"WARNING: {marker}HULL BREACH AT ({row + 1}, {col + 1})!"
-        return f"ENEMY {marker}MISSED AT ({row + 1}, {col + 1})."
+                return f"ACHTUNG: {marker}EIGENER {ship_name.upper()} IST GESUNKEN!"
+            return f"WARNUNG: DU WURDEST{" DURCH " if marker else ""}{marker} GETROFFEN ({row + 1}, {col + 1})!"
+        return f"GEGNER HAT{" MIT " if marker else ""}{marker} VERFEHLT ({row + 1}, {col + 1})."
 
     def _computer_sonar(self, center_row, center_col):
         found_positions = []
@@ -375,6 +376,7 @@ class BattleState(SharedBattleState):
         return found_positions
 
     def _computer_airstrike(self, center_row, center_col):
+        #shots in + muster
         hit_any = False
         coords = [
             (center_row, center_col),
@@ -394,6 +396,7 @@ class BattleState(SharedBattleState):
         return hit_any
 
     def _computer_guided_missile(self):
+        #shot auf random player ship feld
         candidates = []
         for row in range(config.GRID_SIZE):
             for col in range(config.GRID_SIZE):
@@ -412,6 +415,7 @@ class BattleState(SharedBattleState):
         return row, col, hit, destroyed, ship
 
     def _computer_shoot_with_napalm_rules(self, row, col):
+        # hit/miss AI napalm, 2x1 immun
         cell = self.player_board.get_cell(row, col)
         if not cell or cell.is_shot():
             return False, False, None
@@ -434,6 +438,7 @@ class BattleState(SharedBattleState):
         return hit, destroyed, ship
 
     def _progress_computer_fires(self):
+        # AI napalm spread zu 3 nachbarfeldern
         if not self.computer_active_fires:
             return False
 
@@ -467,6 +472,7 @@ class BattleState(SharedBattleState):
         return hit_any
 
     def _computer_napalm(self, row, col):
+        # platziert neues napalm
         cell = self.player_board.get_cell(row, col)
         if not cell or cell.is_shot():
             row, col = self.ai.get_next_shot(self.player_board)
@@ -485,7 +491,7 @@ class BattleState(SharedBattleState):
     # Draw
     # ------------------------------
     def _draw_statistics(self, screen):
-        """Zeichnet Statistiken in modernen Panels"""
+        """panel alignment mit hilfe von KI-chatbot"""
         y = config.GRID_OFFSET_Y + config.GRID_SIZE * config.CELL_SIZE + config.BATTLE_STAT_PANEL_OFFSET_Y
 
         # Player Panel
