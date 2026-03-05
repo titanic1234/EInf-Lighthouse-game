@@ -114,7 +114,7 @@ class SharedBattleState(BaseState):
 
 
     # ------------------------------
-    # Graphic & Logic
+    # Graphics & Logic
     # ------------------------------
     def _get_enemy_board(self):
         if hasattr(self, "computer_board"):
