@@ -1,6 +1,7 @@
+# config.py
+
 """
-Spielkonfiguration fuer Schiffe-Versenken
-Enthaelt alle Konstanten, Farben und Spielregeln
+Enthält alle Konstanten, Variablen, Farben und Spielregeln
 """
 
 # Fenster

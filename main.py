@@ -1,4 +1,7 @@
+# main.py
+
 import sys
+import os
 
 import pgzrun
 import pygame
@@ -17,11 +20,17 @@ _start_check_connection_thread()
 game_manager = GameManager()
 mouse_position = (0, 0)
 
+os.environ['SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS'] = '0' # Verhindert minimieren
 
+# Wechsel Fullscree - Resizable
 def _set_window_mode(windowed: bool):
     flags = pygame.FULLSCREEN if not windowed else DISPLAY_FLAGS
     screen.surface = pygame.display.set_mode((WIDTH, HEIGHT), flags)
 
+
+# ------------------------------
+# Update
+# ------------------------------
 def update():
     global mouse_position
     try:
@@ -34,12 +43,17 @@ def update():
     dt = 1 / 60.0
     game_manager.update(dt, mouse_position)
 
-
+# ------------------------------
+# Draw
+# ------------------------------
 def draw():
     screen.surface.fill((0, 0, 0))
     game_manager.draw(screen.surface)
 
 
+# ------------------------------
+# Events
+# ------------------------------
 def on_mouse_move(pos, rel, buttons):
     del rel, buttons
     global mouse_position
@@ -67,5 +81,5 @@ def on_key_down(key, mod=0):
             print("Display was closed")
 
 
-
+# Start
 pgzrun.go()

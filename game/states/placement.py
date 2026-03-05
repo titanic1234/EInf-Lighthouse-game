@@ -1,3 +1,4 @@
+# placement.py
 """Schiffsplatzierung (Single Player)"""
 
 import game.config as config
@@ -13,6 +14,10 @@ class PlacementState(SharedPlacementState):
         super().__init__(game_manager)
         self.start_button = self.build_primary_action_button("GEFECHT STARTEN", self._start_battle, y_offset=30)
 
+
+    # ------------------------------
+    # Button clicked
+    # ------------------------------
     def _start_battle(self):
         """Startet die Kampfphase"""
         if not self._all_ships_placed():
@@ -22,6 +27,10 @@ class PlacementState(SharedPlacementState):
         self.game_manager.player_board = self.player_board
         self.game_manager.change_state(config.STATE_BATTLE)
 
+
+    # ------------------------------
+    # Action Buttons
+    # ------------------------------
     def _update_action_buttons(self, dt, mouse_pos):
         self.start_button.update(dt, mouse_pos[0], mouse_pos[1])
 
@@ -30,7 +39,6 @@ class PlacementState(SharedPlacementState):
             self.start_button.click()
             return True
         return False
-
 
     def _draw_action_buttons(self, screen):
         if self._all_ships_placed():
