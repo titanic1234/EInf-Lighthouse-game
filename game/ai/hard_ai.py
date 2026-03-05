@@ -195,7 +195,7 @@ class HardComputerAI(NormalComputerAI):
         return random.choice(candidates) if candidates else self._random_untried(board)
 
     def _get_hunt_shot(self, board):
-        # 1. valid shot aus hunt queue
+        # 1. valid shot aus hunt queue oder random valid
         if not self.hunt_queue:
             self._rebuild_hunt_queue(board)
 
