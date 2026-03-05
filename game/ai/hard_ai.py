@@ -8,11 +8,11 @@ from game.ai.normal_ai import NormalComputerAI
 class HardComputerAI(NormalComputerAI):
     def __init__(self):
         super().__init__()
-        self.hide_small_ship_remaining = 0
+        self.hide_small_ship_remaining = False
 
     def place_ships(self, board):
-        # Nicht jedes Spiel gleich: kleines Schiff nur manchmal bewusst verstecken.
-        self.hide_small_ship_remaining = 1 if random.random() < 0.35 else 0
+        # kleines ship nur manchmal "verstecken".
+        self.hide_small_ship_remaining = True if random.random() < 0.45 else False
         super().place_ships(board)
 
     def _choose_ship_placement(self, board, ship):
@@ -24,6 +24,7 @@ class HardComputerAI(NormalComputerAI):
         if not occupied_cells:
             return random.choice(placements)
 
+        # weights hier auch noch kinda random
         spread_weight = random.uniform(2.2, 3.4)
         edge_weight = random.uniform(2.8, 4.2)
         noise = random.uniform(1.0, 2.0)
@@ -35,22 +36,23 @@ class HardComputerAI(NormalComputerAI):
             score = spread_weight * self._distance_to_other_ships(coordinates, occupied_cells)
             score += edge_weight * self._distance_to_edge(coordinates)
 
-            if self.hide_small_ship_remaining > 0 and ship.get_size() <= 3:
-                score += hide_weight * self._small_ship_hide_bonus(coordinates, occupied_cells)
+            if self.hide_small_ship_remaining and ship.get_size() <= 3:
+                score += hide_weight if self._small_ship_hide_spot(coordinates, occupied_cells) else 0
 
             score += random.uniform(-noise, noise)
             scored.append((score, row, col, orientation))
 
+        # sort nach höchstem score und selected random aus top 20%
         scored.sort(key=lambda item: item[0], reverse=True)
         top_pool_size = min(max(4, len(scored) // 5), len(scored))
         top_pool = scored[:top_pool_size]
         chosen = random.choice(top_pool)
         chosen_coords = ship.get_coordinates_at(chosen[1], chosen[2], chosen[3])
 
-        if self.hide_small_ship_remaining > 0 and ship.get_size() <= 3:
-            if self._small_ship_hide_bonus(chosen_coords, occupied_cells) > 0.2:
-                self.hide_small_ship_remaining -= 1
-
+        if self.hide_small_ship_remaining and ship.get_size() <= 3:
+            if self._small_ship_hide_spot(chosen_coords, occupied_cells):
+                self.hide_small_ship_remaining = False
+        #      row,       col,       orientation
         return chosen[1], chosen[2], chosen[3]
 
     def _distance_to_edge(self, coordinates):
@@ -60,46 +62,47 @@ class HardComputerAI(NormalComputerAI):
         ]
         return sum(edge_distances) / max(1, len(edge_distances))
 
-    def _small_ship_hide_bonus(self, coordinates, occupied_cells):
+    def _small_ship_hide_spot(self, coordinates, occupied_cells):
+        # true wenn coords am Rand oder nahe eines anderen ships
         if not occupied_cells:
             return 0.0
 
-        near_edge_cells = sum(
-            1
-            for row, col in coordinates
-            if min(row, col, GRID_SIZE - 1 - row, GRID_SIZE - 1 - col) <= 1
+        # menge der belegten randfelder
+        edge_cells = sum(
+            1 for row, col in coordinates
+            if min(row, col, GRID_SIZE - 1 - row, GRID_SIZE - 1 - col) == 0
         )
-        nearest = min(
-            abs(row - other_row) + abs(col - other_col)
-            for row, col in coordinates
+        #menge der felder neben einem anderem ship
+        adjacent = len({
+            (row, col) for row, col in coordinates
             for other_row, other_col in occupied_cells
-        )
+            if abs(row - other_row) + abs(col - other_col) == 2
+        })
 
-        edge_factor = near_edge_cells / max(1, len(coordinates))
-        near_ship_factor = max(0.0, 4.0 - nearest) / 4.0
-        return edge_factor + near_ship_factor
+        edge_factor = edge_cells >= 2
+        near_ship_factor = adjacent == len(coordinates)
+        return edge_factor or near_ship_factor
 
     def choose_action(self, board):
-        # Guided missile zum finden neuer targets einsetzen
         if self.abilities["guided"] > 0 and self._should_use_guided(board):
             self.abilities["guided"] -= 1
             row, col = self._random_untried(board)
             return {"type": "guided", "row": row, "col": col}
 
-        # Sonar früh einsetzen, um schnell Zielzellen zu markieren
+        # Sonar früh für info
         if self.abilities["sonar"] > 0:
             self.abilities["sonar"] -= 1
             row, col = self._best_sonar_center(board)
             return {"type": "sonar", "row": row, "col": col}
 
-        # Airstrike auf unbeschossenes Gebiet
-        if self.abilities["airstrike"] > 0:
+        # Airstrike früh flächendeckend
+        if self.abilities["airstrike"] > 0 and self.mode == self.MODE_HUNT:
             self.abilities["airstrike"] -= 1
             row, col = self._best_airstrike_center(board)
             return {"type": "airstrike", "row": row, "col": col}
 
-        # Napalm optional in der Suche; danach nicht auf markierte Felder schießen
-        if self.abilities["napalm"] > 0 and self.mode == self.MODE_HUNT and random.random() < 0.3:
+        # Napalm für Suche, etwas später
+        if self.abilities["napalm"] > 0 and self.mode == self.MODE_HUNT and random.random() <= 0.6:
             self.abilities["napalm"] -= 1
             row, col = self._best_hunt_cell(board)
             return {"type": "napalm", "row": row, "col": col}
@@ -108,7 +111,7 @@ class HardComputerAI(NormalComputerAI):
         return {"type": "shoot", "row": row, "col": col}
 
     def _should_use_guided(self, board):
-        """Nutze guided missile nur für 2x1 oder um neues ship zu finden"""
+        #guided nur für 2x1 oder um neues ship zu finden wenn 2x1 kaputt
         remaining = [ship for ship in board.ships if not ship.is_destroyed()]
         two_cell_remaining = [ship for ship in remaining if ship.get_size() == 2]
         all_except_two_destroyed = len(remaining) == 1 and len(two_cell_remaining) == 1
@@ -125,6 +128,7 @@ class HardComputerAI(NormalComputerAI):
         return False
 
     def _has_open_targets(self, board):
+        #prüft auf sonar marks oder undestroyte ships
         if self.known_ship_cells:
             return True
 
@@ -141,7 +145,8 @@ class HardComputerAI(NormalComputerAI):
         return False
 
     def _best_sonar_center(self, board):
-        best_cells = []
+        # random 3x3 area, da quasi immer sonar 1st
+        best = []
         best_score = -1
         for row in range(GRID_SIZE):
             for col in range(GRID_SIZE):
@@ -149,33 +154,39 @@ class HardComputerAI(NormalComputerAI):
                 for r in range(row - 1, row + 2):
                     for c in range(col - 1, col + 2):
                         cell = board.get_cell(r, c)
-                        if cell and not cell.is_shot() and (r, c) not in self.tried_positions and (r, c) not in self.sonar_miss_positions:
+                        if cell and not cell.is_shot() and (r, c) not in self.tried_positions:
                             score += 1
                 if score > best_score:
-                    best_cells = [(row, col)]
+                    best = [(row, col)]
                     best_score = score
                 elif score == best_score:
-                    best_cells.append((row, col))
-        if best_cells:
-            return random.choice(best_cells)
-        return random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1)
+                    best.append((row, col))
+        if best:
+            return random.choice(best)
+        return random.choice(best) if best else random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1)
 
     def _best_airstrike_center(self, board):
-        best = None
+        # airstrike auf Felder ohne info
+        best = []
         best_score = -1
         for row in range(GRID_SIZE):
             for col in range(GRID_SIZE):
                 score = 0
                 for r, c in ((row, col), (row - 1, col), (row + 1, col), (row, col - 1), (row, col + 1)):
                     cell = board.get_cell(r, c)
-                    if cell and not cell.is_shot() and not cell.napalm_marked:
+                    #score++ für jedes feld ohne info
+                    if cell and not (cell.is_shot() or cell.napalm_marked or (r, c) in self.sonar_miss_positions
+                                     or (r, c) in self.known_ship_cells or (r, c) in self.tried_positions):
                         score += 1
                 if score > best_score:
-                    best = (row, col)
+                    best = [(row, col)]
                     best_score = score
-        return best if best else (random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1))
+                if score == best_score:
+                    best.append((row, col))
+        return random.choice(best) if best else (random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1))
 
     def _best_hunt_cell(self, board):
+        # currently nur random non-napalm unbeschossenes feld
         candidates = [
             (r, c)
             for r, c in self._available_positions(board)
@@ -184,6 +195,7 @@ class HardComputerAI(NormalComputerAI):
         return random.choice(candidates) if candidates else self._random_untried(board)
 
     def _get_hunt_shot(self, board):
+        # 1. valid shot aus hunt queue
         if not self.hunt_queue:
             self._rebuild_hunt_queue(board)
 
@@ -199,7 +211,7 @@ class HardComputerAI(NormalComputerAI):
         return self._best_hunt_cell(board)
 
     def _rebuild_hunt_queue(self, board):
-        # Raster mit Abstand 2 (mod 3), um größere Fläche abzudecken
+        # Raster mit 2 abstand und napalm als miss, da 2x1 durch guided finden
         offset = random.randint(0, 2)
         candidates = []
         for row, col in self._available_positions(board):

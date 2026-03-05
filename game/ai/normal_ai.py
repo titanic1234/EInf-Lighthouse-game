@@ -1,4 +1,4 @@
-"""Standard KI. Hunt raster, random abilities, smarteres placement"""
+"""Standard AI: Hunt raster, random abilities, smarteres placement"""
 
 import random
 from game.config import GRID_SIZE
@@ -16,6 +16,7 @@ class NormalComputerAI(BaseComputerAI):
         self.abilities = dict(self.DEFAULT_ABILITIES)
 
     def choose_action(self, board):
+        # random ability oder standard hunt/target
         available_abilities = [name for name, charges in self.abilities.items() if charges > 0]
         if available_abilities and random.random() < 0.35:
             ability = random.choice(available_abilities)
@@ -27,6 +28,7 @@ class NormalComputerAI(BaseComputerAI):
         return {"type": "shoot", "row": row, "col": col}
 
     def _choose_ship_placement(self, board, ship):
+        # priorisiert Abstand um double-hits gegn. abilities zu vermindern
         placements = self._collect_possible_placements(board, ship)
         if not placements:
             return None
@@ -35,9 +37,11 @@ class NormalComputerAI(BaseComputerAI):
         if not occupied_cells:
             return random.choice(placements)
 
-        spread_weight = random.uniform(1.7, 3.0)
-        noise = random.uniform(1.8, 3.0)
+        # weights so nach Gefühl weil kein bock zu testen xD
+        spread_weight = random.uniform(1.7, 3.4)
+        noise = random.uniform(1.5, 2.5)
 
+        # grade placement möglichkeiten nach distanz zu anderen
         scored = []
         for row, col, orientation in placements:
             coordinates = ship.get_coordinates_at(row, col, orientation)
@@ -59,12 +63,14 @@ class NormalComputerAI(BaseComputerAI):
         return total / max(1, len(coordinates))
 
     def _random_untried(self, board):
+        # fallback auf random shot
         available = self._available_positions(board)
         if not available:
             return random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1)
         return random.choice(available)
 
     def _get_hunt_shot(self, board):
+        #folgt hunt-muster aus hunt queue, random wenn nicht möglich
         if not self.hunt_queue:
             self._rebuild_hunt_queue(board)
 
@@ -84,6 +90,7 @@ class NormalComputerAI(BaseComputerAI):
         return shot
 
     def _rebuild_hunt_queue(self, board):
+        #Schachbrettraster mit prio einer diagonalen für flächendeckung
         self.diagonal_offset = random.randint(0, 3)
 
         available = self._available_positions(board)

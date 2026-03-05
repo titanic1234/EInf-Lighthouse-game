@@ -1,4 +1,4 @@
-"""Parent class mit Basislogik für Computer-KIs."""
+"""Parent class mit AI Basislogik"""
 
 import random
 from game.config import GRID_SIZE, SHIP_TYPES, ORIENTATION_COUNT
@@ -14,16 +14,16 @@ class BaseComputerAI:
         self.possible_targets = []
         self.tried_positions = set()
         self.unresolved_hits = set()
-        self.known_ship_cells = set()  # noch nicht beschossene Sonar-Marks
+        self.known_ship_cells = set()  # offene Sonar-Marks
         self.sonar_miss_positions = set()
 
     def choose_action(self, board):
-        """Wird von Unterklassen überschrieben. Rückgabe: dict(type=..., row=..., col=...)."""
+        #von Unterklassen überschrieben.
         row, col = self.get_next_shot(board)
         return {"type": "shoot", "row": row, "col": col}
 
     def place_ships(self, board):
-        """Platziert Schiffe für diese KI. Standard: vollständig zufällig."""
+        # AI placement, fallback auf random
         for ship_type in SHIP_TYPES:
             ship_name, ship_length, ship_count = ship_type[:3]
             ship_shape = ship_type[3] if len(ship_type) > 3 else None
@@ -35,18 +35,19 @@ class BaseComputerAI:
                     board.place_ship(ship, row, col, orientation)
                     continue
 
-                # robuster Fallback
                 self._place_ship_randomly(board, ship)
 
         board.all_ships_placed = True
 
     def _choose_ship_placement(self, board, ship):
+        # random placement als basis
         placements = self._collect_possible_placements(board, ship)
         if not placements:
             return None
         return random.choice(placements)
 
     def _collect_possible_placements(self, board, ship):
+        # return alle valid placements für das schiff
         placements = []
         for orientation in range(ORIENTATION_COUNT):
             for row in range(GRID_SIZE):
@@ -56,6 +57,7 @@ class BaseComputerAI:
         return placements
 
     def _place_ship_randomly(self, board, ship):
+        #Fallback falls possible placements nicht richtig funktioniert
         placed = False
         attempts = 0
         while not placed and attempts < 1000:
@@ -67,6 +69,7 @@ class BaseComputerAI:
             attempts += 1
 
     def _occupied_ship_cells(self, board):
+        # alle Felder mit ship drauf
         return [
             (row_idx, col_idx)
             for row_idx, row in enumerate(board.grid)
@@ -75,6 +78,7 @@ class BaseComputerAI:
         ]
 
     def register_sonar_findings(self, found_positions):
+        # merkt sich targets
         for pos in found_positions:
             self.sonar_miss_positions.discard(pos)
             if pos not in self.tried_positions:
@@ -87,6 +91,7 @@ class BaseComputerAI:
             self.sonar_miss_positions.add(pos)
 
     def get_next_shot(self, board):
+        # wählt nächsten Target-Mode shot oder returned zur suche
         if self.mode == self.MODE_TARGET:
             if not self.possible_targets and self._has_pending_target_info():
                 self._rebuild_targets_from_hits()
@@ -101,12 +106,14 @@ class BaseComputerAI:
         return self._get_hunt_shot(board)
 
     def _has_pending_target_info(self):
+        # True wenn ships hit aber nicht destroyed, oder offene sonar-marks
         return bool(self.unresolved_hits or self.known_ship_cells)
 
     def _get_hunt_shot(self, board):
         raise NotImplementedError
 
     def _available_positions(self, board):
+        # returned ungecheckte felder
         available = []
         for row in range(GRID_SIZE):
             for col in range(GRID_SIZE):
@@ -120,6 +127,7 @@ class BaseComputerAI:
         return available
 
     def _pop_known_ship_target(self, board):
+        # selected random ein nicht beschossenes sonar-mark
         candidates = [
             pos for pos in self.known_ship_cells
             if pos not in self.tried_positions and board.get_cell(*pos) and not board.get_cell(*pos).is_shot()
@@ -133,6 +141,7 @@ class BaseComputerAI:
         return shot
 
     def _pop_next_target(self, board):
+        #selected aus target mode targets oder wechselt zur suche
         while self.possible_targets:
             shot = self.possible_targets.pop(0)
             if shot in self.tried_positions:
@@ -146,6 +155,7 @@ class BaseComputerAI:
         return self._get_hunt_shot(board)
 
     def register_shot_result(self, row, col, hit, destroyed, ship):
+        # verarbeitet hit/miss nach shot
         self.tried_positions.add((row, col))
         self.known_ship_cells.discard((row, col))
         self.sonar_miss_positions.discard((row, col))
@@ -160,9 +170,10 @@ class BaseComputerAI:
         self._rebuild_targets_from_hits()
 
     def _rebuild_targets_from_hits(self):
+        # setzt Felder angrenzend an Hits für target mode
         self.possible_targets = []
 
-        # Sonar-Hinweise immer zuerst priorisieren
+        # Sonar-marks priorisieren
         for sonar_pos in list(self.known_ship_cells):
             self._append_target_if_valid(*sonar_pos)
 
@@ -198,6 +209,7 @@ class BaseComputerAI:
                 self._append_target_if_valid(cand_row, cand_col)
 
     def _get_hit_clusters(self):
+        # sortiert hits nach position, vermindert confusion bei hits an mehreren ships
         remaining_hits = set(self.unresolved_hits)
         clusters = []
 
@@ -220,6 +232,7 @@ class BaseComputerAI:
         return clusters
 
     def _append_target_if_valid(self, row, col):
+        # filtert dopplung und invalid coords
         if (
             0 <= row < GRID_SIZE
             and 0 <= col < GRID_SIZE
@@ -230,6 +243,7 @@ class BaseComputerAI:
             self.possible_targets.append((row, col))
 
     def _mark_destroyed_ship_surroundings(self, ship):
+        #mark felder um zerstörtes ship als irrelevant
         if not ship:
             return
 
@@ -241,9 +255,9 @@ class BaseComputerAI:
                     if 0 <= nr < GRID_SIZE and 0 <= nc < GRID_SIZE:
                         self.tried_positions.add((nr, nc))
                         self.known_ship_cells.discard((nr, nc))
-                        #self.sonar_miss_positions.discard((nr, nc))
 
     def reset(self):
+        # cleared variablen
         self.mode = self.MODE_HUNT
         self.possible_targets = []
         self.tried_positions = set()
