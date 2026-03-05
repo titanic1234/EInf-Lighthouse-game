@@ -1,3 +1,5 @@
+# menu.py
+
 """
 Hauptmenue-State mit aufgewerteter UI
 """
@@ -24,6 +26,10 @@ class MenuState(BaseState):
         self.buttons = []
         self._create_buttons()
 
+
+    # ------------------------------
+    # create buttons
+    # ------------------------------
     def _create_buttons(self):
         """Erstellt die Menue-Buttons"""
         center_x = config.WINDOW_WIDTH // 2
@@ -92,12 +98,36 @@ class MenuState(BaseState):
             self.buttons.append(btn)
             self.button_map[key] = btn
 
+
+    # ------------------------------
+    # Button clicked
+    # ------------------------------
     def _toggle_theme(self):
         theme_manager.toggle()
-        # Rekonstruiere Buttons
+        # Buttons werden mit neuem Theme neu erstellt
         self.buttons = []
         self._create_buttons()
 
+    def _start_game(self):
+        """Startet ein neues Spiel"""
+        self.game_manager.change_state(config.STATE_PLACEMENT)
+
+    def _start_multiplayer(self):
+        """Gehe ins Multiplayer-Menu"""
+        self.game_manager.change_state(config.STATE_MULTIPLAYER_MENU)
+
+    def _do_nothing(self):
+        pass
+
+    def _quit_game(self):
+        """Beendet das Spiel"""
+        import sys
+        sys.exit()
+
+
+    # ------------------------------
+    # processing buttons
+    # ------------------------------
     def _multiplayer_button_state(self):
         if mconfig.CONNECTION:
             return "Multiplayer", self._start_multiplayer
@@ -108,10 +138,6 @@ class MenuState(BaseState):
         label, action = self._multiplayer_button_state()
         multiplayer_button.text = label
         multiplayer_button.action = action
-
-    def _start_game(self):
-        """Startet ein neues Spiel"""
-        self.game_manager.change_state(config.STATE_PLACEMENT)
 
     def _refresh_difficulty_text(self):
         difficulty_names = {
@@ -130,18 +156,10 @@ class MenuState(BaseState):
         self._refresh_difficulty_text()
         self.button_map["difficulty"].text = self.difficulty_text
 
-    def _start_multiplayer(self):
-        """Gehe ins Multiplayer-Menu"""
-        self.game_manager.change_state(config.STATE_MULTIPLAYER_MENU)
 
-    def _do_nothing(self):
-        pass
-
-    def _quit_game(self):
-        """Beendet das Spiel"""
-        import sys
-        sys.exit()
-
+    # ------------------------------
+    # Events
+    # ------------------------------
     def update(self, dt, mouse_pos):
         """Aktualisiert das Menue"""
         mouse_x, mouse_y = mouse_pos
@@ -149,7 +167,6 @@ class MenuState(BaseState):
             button.update(dt, mouse_x, mouse_y)
 
         self._update_multiplayer_button()
-
 
     def on_mouse_down(self, pos, button):
         """Behandelt Mausklicks"""

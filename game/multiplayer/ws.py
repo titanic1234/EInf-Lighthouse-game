@@ -1,3 +1,9 @@
+# ws.py
+
+"""
+Websocket stellt im Hintergrund eine Verbindung zum Server her.
+"""
+
 import json
 import threading
 import time
@@ -11,11 +17,16 @@ import game.multiplayer.multiplayer_config as mconfig
 
 class WSClient:
     """
-    Minimaler WebSocket-Client für Games:
-    - verbindet im Hintergrund
-    - send_json() ist non-blocking (queued)
-    - poll() liefert eingehende Messages (non-blocking)
-    - status: connected/disconnected
+    - start() startet den WS-Thread
+    - stop() beendet den WS-Thread
+    - is_connected() liefert den Verbindungsstatus mit True/False
+    - poll_status() True/False bei neuer Message oder None wenn keine neue Message
+    - poll() liefert eingehende JSON-Messages als dict oder None wenn keine neue Message
+    - send_json() fügt eine neue JSON-Message zu outgoing hinzu
+    - _build_url() returned die dynamisch gebaute URL
+    - _set_connected() setzt den Verbindungsstatus
+    - _drain_outgoing() sende alle outgoing Messages
+    - _run() stellt die Verbindung zum Server her
     """
 
     def __init__(self, reconnect: bool = True, reconnect_delay_s: float = 1.0):
@@ -59,21 +70,18 @@ class WSClient:
         return self._connected
 
     def poll_status(self) -> bool | None:
-        """Non-blocking: True/False wenn neuer Status da, sonst None."""
         try:
             return self._status.get_nowait()
         except Empty:
             return None
 
     def poll(self) -> dict | None:
-        """Non-blocking: nächste eingehende JSON-Message oder None."""
         try:
             return self._incoming.get_nowait()
         except Empty:
             return None
 
     def send_json(self, msg: dict):
-        """Non-blocking: queued JSON -> wird im WS-Thread gesendet."""
         self._outgoing.put(json.dumps(msg))
 
     # ---------------- internal ----------------
@@ -87,7 +95,6 @@ class WSClient:
 
     def _set_connected(self, value: bool):
         self._connected = value
-        # Queue maxsize=1: immer nur neuesten Status behalten
         try:
             while True:
                 self._status.get_nowait()

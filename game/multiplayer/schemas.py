@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+# schemas.py
+
+from pydantic import BaseModel # https://docs.pydantic.dev/latest/#pydantic-examples
 
 
 class CreateGame(BaseModel):

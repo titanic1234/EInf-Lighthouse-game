@@ -12,7 +12,7 @@ from game.states.base_state import BaseState
 
 
 class MultiplayerLobbyState(BaseState):
-    """Multiplayer: Lobby"""
+    """Multiplayer: SharedState für Create und Join Game Screen"""
 
     def __init__(self, game_manager):
         super().__init__(game_manager)
@@ -45,7 +45,7 @@ class MultiplayerLobbyState(BaseState):
         self.name_rect = pygame.Rect(center_x - self.field_w // 2, fields_top, self.field_w, self.field_h)
         self.room_rect = pygame.Rect(center_x - self.field_w // 2, fields_top + 120, self.field_w, self.field_h)
 
-        # Buttons unter die Felder setzen
+        # Buttons
         self.buttons = []
         self.text_fields = []
 
@@ -55,6 +55,7 @@ class MultiplayerLobbyState(BaseState):
             pygame.scrap.init()
         except Exception:
             self.clipboard_ok = False
+
 
     # ------------------------------
     # Button create
@@ -82,6 +83,7 @@ class MultiplayerLobbyState(BaseState):
             ),
         ]
 
+
     # ------------------------------
     # Button clicked
     # ------------------------------
@@ -91,6 +93,7 @@ class MultiplayerLobbyState(BaseState):
 
     def _back_menu(self):
         self.game_manager.change_state(config.STATE_MULTIPLAYER_MENU)
+
 
     # ------------------------------
     # Clipboard helpers (Paste)
@@ -107,7 +110,6 @@ class MultiplayerLobbyState(BaseState):
             return ""
 
     def _paste_into_room(self):
-        """Paste in Room Code: A-Z0-9, uppercase, max_len."""
         if self.room_locked:
             return
         clip = self._get_clipboard_text().strip()
@@ -124,7 +126,6 @@ class MultiplayerLobbyState(BaseState):
         self.room_text += filtered[:remaining]
 
     def _paste_into_name(self):
-        """Optional: Paste in Name (filter control chars), max_len."""
         clip = self._get_clipboard_text().strip()
         if not clip:
             return
@@ -137,6 +138,7 @@ class MultiplayerLobbyState(BaseState):
             return
         self.name_text += filtered[:remaining]
 
+
     # ------------------------------
     # Events
     # ------------------------------
@@ -144,7 +146,7 @@ class MultiplayerLobbyState(BaseState):
         if button != 1:
             return
 
-        # Fokus auf Textfelder
+        # Fokus auf Namensfeld
         if self.name_rect.collidepoint(pos):
             self.focus = "name"
             self.cursor_t = 0.0
@@ -161,7 +163,6 @@ class MultiplayerLobbyState(BaseState):
 
         for btn in self.buttons:
             if btn.hovered:
-                # falls disabled: nicht klicken
                 if hasattr(btn, "enabled") and not btn.enabled:
                     return
                 btn.click()
@@ -194,12 +195,12 @@ class MultiplayerLobbyState(BaseState):
                 self.room_text = self.room_text[:-1]
             return
 
-        # STRG+C kopiert Room Code
+        # STRG+C
         if key == keys.C and (mod & keymods.CTRL):
             self._copy_room_code()
             return
 
-        # ✅ STRG+V Paste
+        # STRG+V
         if key == keys.V and (mod & keymods.CTRL):
             if self.focus == "room" and not self.room_locked:
                 self._paste_into_room()
@@ -212,7 +213,7 @@ class MultiplayerLobbyState(BaseState):
         if mods & (keymods.CTRL | keymods.ALT | keymods.META):
             return
 
-        # Name: Buchstaben/Zahlen/Space usw.
+        # Input für Name
         if self.focus == "name":
             ch = None
 
@@ -239,7 +240,7 @@ class MultiplayerLobbyState(BaseState):
             if ch and len(self.name_text) < self.name_max_len:
                 self.name_text += ch
 
-        # Room Code
+        # Input für Code; Nur Zahlen und Großbuchstaben
         elif self.focus == "room" and not self.room_locked:
             if len(self.room_text) >= self.room_max_len:
                 return
@@ -254,23 +255,6 @@ class MultiplayerLobbyState(BaseState):
                 self.room_text += chr(key)
                 return
 
-    def on_text_input(self, text: str):
-        """Optional: falls dein GameManager pygame.TEXTINPUT weiterreicht (z.B. für Umlaute)."""
-        if not text:
-            return
-        ch = text[0]
-        if ch in "\r\n\t":
-            return
-        if ord(ch) < 32:
-            return
-
-        if self.focus == "name":
-            if len(self.name_text) < self.name_max_len:
-                self.name_text += ch
-        elif self.focus == "room" and not self.room_locked:
-            # hier nur digits wie vorher
-            if ch.isdigit() and len(self.room_text) < self.room_max_len:
-                self.room_text += ch
 
     # ------------------------------
     # Draw
@@ -298,7 +282,7 @@ class MultiplayerLobbyState(BaseState):
         screen.blit(surf, (rect.x + 16, rect.centery - surf.get_height() // 2))
 
         if focused and (not locked) and (int(self.cursor_t * 2) % 2 == 0):
-            cx = rect.x + 16 + min(rect.w - 32, 12 * len(value))
+            cx = rect.x + 22 + min(rect.w - 28, 14 * len(value))
             pygame.draw.line(screen, text_col, (cx, rect.y + 10), (cx, rect.bottom - 10), 2)
 
     def draw(self, screen):

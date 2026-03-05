@@ -1,4 +1,6 @@
-from dataclasses import dataclass, field
+# models.py
+
+from dataclasses import dataclass, field # https://docs.python.org/3/library/dataclasses.html
 from typing import Optional
 
 
@@ -18,7 +20,7 @@ class PlayerState:
 class GameRoom:
     code: str
     host: PlayerState
-    guest: Optional[PlayerState] = None
+    guest: Optional[PlayerState] = None # So wie PlayerState | None = None
     phase: str = "waiting"   # waiting, setup, playing, finished
-    turn: str = "host"       # host or guest
+    turn: str = "host"       # host oder guest
     winner: Optional[str] = None

@@ -14,19 +14,16 @@ from game.multiplayer.communication import create_game as create_game_request
 
 
 class MultiplayerState(BaseState):
-    """Multiplayer-State"""
+    """Multiplayer Menu"""
     def __init__(self, game_manager):
-        """
-        Initialisiert die Multiplayer-Seite
-
-        Args:
-            game_manager: Referenz zum GameManager
-        """
         super().__init__(game_manager)
+        # Buttons
         self.buttons = []
         self._create_buttons()
 
-
+    # ------------------------------
+    # Create Buttons
+    # ------------------------------
     def _create_buttons(self):
         """Erstellt die Menue-Buttons"""
         center_x = config.WINDOW_WIDTH // 2
@@ -70,33 +67,33 @@ class MultiplayerState(BaseState):
             )
         )
 
-    def _toggle_theme(self):
-        theme_manager.toggle()
-        # Rekonstruiere Buttons
-        self.buttons = []
-        self._create_buttons()
 
+    # ------------------------------
+    # Button clicked
+    # ------------------------------
     def _back_menu(self):
-        """Zurück ins Menu"""
+        """Zurück ins Hauptmenu"""
         self.game_manager.change_state(config.STATE_MENU)
 
     def _create_game(self):
+        """Erstellt ein neues Spiel"""
         create_game_request()
         self.game_manager.change_state(config.STATE_MULTIPLAYER_CREATE)
 
     def _join_game(self):
+        """Öffnet Screen zum joinen eines Spiels"""
         self.game_manager.change_state(config.STATE_MULTIPLAYER_JOIN)
 
 
-
+    # ------------------------------
+    # Events
+    # ------------------------------
     def update(self, dt, mouse_pos):
-        """Aktualisiert das Menue"""
         mouse_x, mouse_y = mouse_pos
         for button in self.buttons:
             button.update(dt, mouse_x, mouse_y)
 
     def on_mouse_down(self, pos, button):
-        """Behandelt Mausklicks"""
         if button == 1:  # Linke Maustaste
             for btn in self.buttons:
                 if btn.hovered:
@@ -104,7 +101,6 @@ class MultiplayerState(BaseState):
                     break
 
     def draw(self, screen):
-        """Zeichnet das Menue"""
         theme = theme_manager.current
         # Premium Gradient Background
         draw_gradient_background(screen, time_value=self.game_manager.time_elapsed)

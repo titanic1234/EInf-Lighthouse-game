@@ -1,3 +1,5 @@
+# shared_battle.py
+
 """Gemeinsame Battle-Logik für Singleplayer und Multiplayer."""
 
 import os
@@ -39,22 +41,10 @@ class SharedBattleState(BaseState):
         self._load_ability_icons()
         self._rebuild_ability_buttons()
 
-    def _get_enemy_board(self):
-        if hasattr(self, "computer_board"):
-            return self.computer_board
-        if hasattr(self, "opponent_board"):
-            return self.opponent_board
-        return None
 
-    def _load_icon(self, filename):
-        path = os.path.join("images", filename)
-        if not os.path.exists(path):
-            return None
-        try:
-            return pygame.image.load(path).convert_alpha()
-        except pygame.error:
-            return None
-
+    # ------------------------------
+    # Ability
+    # ------------------------------
     def _load_ability_icons(self):
         is_modern = theme_manager.current.name == "MODERN"
         self.ability_icons = {
@@ -108,6 +98,26 @@ class SharedBattleState(BaseState):
         }
         self.message = label.get(name, "SPEZIALFÄHIGKEIT AKTIV")
 
+
+    # ------------------------------
+    # Graphic & Logic
+    # ------------------------------
+    def _get_enemy_board(self):
+        if hasattr(self, "computer_board"):
+            return self.computer_board
+        if hasattr(self, "opponent_board"):
+            return self.opponent_board
+        return None
+
+    def _load_icon(self, filename):
+        path = os.path.join("images", filename)
+        if not os.path.exists(path):
+            return None
+        try:
+            return pygame.image.load(path).convert_alpha()
+        except pygame.error:
+            return None
+
     def _toggle_player_marker(self, pos):
         board = self._get_enemy_board()
         if not board:
@@ -134,9 +144,18 @@ class SharedBattleState(BaseState):
         else:
             self.particles.add_splash(x, y, count=25)
 
+    def _enemy_board_header(self):
+        if self.enemy_board_title:
+            return self.enemy_board_title
+        return theme_manager.current.text_battle_enemy_radar
+
     def _update_pipeline(self, dt, mouse_pos):
         """Hook for subclasses (AI turn, WS polling, timers, ...)."""
 
+
+    # ------------------------------
+    # Events
+    # ------------------------------
     def update(self, dt, mouse_pos):
         self.particles.update(dt)
         self._update_pipeline(dt, mouse_pos)
@@ -174,11 +193,10 @@ class SharedBattleState(BaseState):
         else:
             self._player_shoot(row, col)
 
-    def _enemy_board_header(self):
-        if self.enemy_board_title:
-            return self.enemy_board_title
-        return theme_manager.current.text_battle_enemy_radar
 
+    # ------------------------------
+    # Draw
+    # ------------------------------
     def _draw_ability_buttons(self, screen):
         for name, rect in self.ability_buttons:
             charges = self.abilities[name]["charges"]

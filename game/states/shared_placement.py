@@ -1,6 +1,7 @@
 # shared_placement.py
 """Gemeinsame Placement-Logik für Singleplayer und Multiplayer."""
 
+
 from pgzero.keyboard import keys
 from pgzero.rect import Rect
 
@@ -38,6 +39,10 @@ class SharedPlacementState(BaseState):
         self.ship_list_item_rects = []
         self.mouse_pos = (0, 0)
 
+
+    # ------------------------------
+    # Logic
+    # ------------------------------
     def _create_ships(self):
         for ship_type in config.SHIP_TYPES:
             ship_name, ship_length, ship_count = ship_type[:3]
@@ -83,43 +88,21 @@ class SharedPlacementState(BaseState):
         self.preview_position = cell_pos
         return True
 
-    def _draw_ship_sprite_preview(self, screen):
-        if not self.selected_ship:
-            return
 
-        if self.preview_position:
-            row, col = self.preview_position
-            min_row, min_col, max_row, max_col = self._get_ship_bounds(
-                self.selected_ship, row, col, self.current_orientation
-            )
-            grid_width = max_col - min_col + 1
-            grid_height = max_row - min_row + 1
-            x, y, _, _ = self._get_preview_bounds(self.selected_ship, row, col, self.current_orientation)
-            ship_coords = self.selected_ship.get_coordinates_at(row, col, self.current_orientation)
-        else:
-            min_row, min_col, max_row, max_col = self._get_ship_bounds(self.selected_ship, 0, 0, self.current_orientation)
-            grid_width = max_col - min_col + 1
-            grid_height = max_row - min_row + 1
-            width = grid_width * config.CELL_SIZE
-            height = grid_height * config.CELL_SIZE
-            x = self.mouse_pos[0] - width // 2
-            y = self.mouse_pos[1] - height // 2
-            ship_coords = self.selected_ship.get_coordinates_at(0, 0, self.current_orientation)
+    # ------------------------------
+    # Hooks
+    # ------------------------------
+    def _handle_action_button_click(self, pos):
+        """Hook for subclasses."""
+        return False
 
-        transformed = _get_transformed_ship_surface(
-            self.selected_ship,
-            grid_width,
-            grid_height,
-            self.current_orientation,
-            ship_coords=ship_coords,
-        )
-        if transformed is None:
-            return
+    def _update_action_buttons(self, dt, mouse_pos):
+        """Hook for subclasses."""
 
-        preview_surface = transformed.copy()
-        preview_surface.set_alpha(210 if self.placement_valid else 130)
-        screen.blit(preview_surface, (x, y))
 
+    # ------------------------------
+    # Events
+    # ------------------------------
     def update(self, dt, mouse_pos):
         self.player_board.all_ships_placed = self._all_ships_placed()
         self.mouse_pos = mouse_pos
@@ -169,6 +152,10 @@ class SharedPlacementState(BaseState):
         if key == keys.R and self.selected_ship:
             self.current_orientation = (self.current_orientation + 1) % config.ORIENTATION_COUNT
 
+
+    # ------------------------------
+    # Draw
+    # ------------------------------
     def draw(self, screen):
         theme = theme_manager.current
         draw_gradient_background(screen, time_value=self.game_manager.time_elapsed)
@@ -308,13 +295,6 @@ class SharedPlacementState(BaseState):
             self.ship_list_item_rects.append((ship, Rect(sprite_x, sprite_y, sprite_width, sprite_height)))
             cursor_y += sprite_height + 24
 
-    def _update_action_buttons(self, dt, mouse_pos):
-        """Hook for subclasses."""
-
-    def _handle_action_button_click(self, pos):
-        """Hook for subclasses."""
-        return False
-
     def _draw_action_buttons(self, screen):
         """Hook for subclasses."""
 
@@ -325,6 +305,46 @@ class SharedPlacementState(BaseState):
         draw_rounded_rect(screen, theme.color_ship_border, toast_rect, radius=16, width=2, alpha=120)
         draw_text(screen, text, toast_rect.centerx, toast_rect.centery, 30, theme.color_text_primary, center=True)
 
+    def _draw_ship_sprite_preview(self, screen):
+        if not self.selected_ship:
+            return
+
+        if self.preview_position:
+            row, col = self.preview_position
+            min_row, min_col, max_row, max_col = self._get_ship_bounds(
+                self.selected_ship, row, col, self.current_orientation
+            )
+            grid_width = max_col - min_col + 1
+            grid_height = max_row - min_row + 1
+            x, y, _, _ = self._get_preview_bounds(self.selected_ship, row, col, self.current_orientation)
+            ship_coords = self.selected_ship.get_coordinates_at(row, col, self.current_orientation)
+        else:
+            min_row, min_col, max_row, max_col = self._get_ship_bounds(self.selected_ship, 0, 0, self.current_orientation)
+            grid_width = max_col - min_col + 1
+            grid_height = max_row - min_row + 1
+            width = grid_width * config.CELL_SIZE
+            height = grid_height * config.CELL_SIZE
+            x = self.mouse_pos[0] - width // 2
+            y = self.mouse_pos[1] - height // 2
+            ship_coords = self.selected_ship.get_coordinates_at(0, 0, self.current_orientation)
+
+        transformed = _get_transformed_ship_surface(
+            self.selected_ship,
+            grid_width,
+            grid_height,
+            self.current_orientation,
+            ship_coords=ship_coords,
+        )
+        if transformed is None:
+            return
+
+        preview_surface = transformed.copy()
+        preview_surface.set_alpha(210 if self.placement_valid else 130)
+        screen.blit(preview_surface, (x, y))
+
+    # ------------------------------
+    # staticmethod
+    # ------------------------------
     @staticmethod
     def build_primary_action_button(text, action, y_offset):
         return GlowButton(

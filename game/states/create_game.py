@@ -16,7 +16,7 @@ class CreateGameState(MultiplayerLobbyState):
         super().__init__(game_manager)
 
         # ---- Field State ----
-        self.room_locked = True  # gesperrt: nicht editierbar/fokussierbar, aber kopierbar
+        self.room_locked = True  # gesperrt: kann nur kopiert werden, nicht bearbeitet
 
         # ---- Clipboard / Toast ----
         self.clipboard_ok = True
@@ -90,12 +90,11 @@ class CreateGameState(MultiplayerLobbyState):
 
 
     # ------------------------------
-    # Draw
+    # Draw / Toast
     # ------------------------------
     def draw(self, screen):
         super().draw(screen)
 
-        # Toast (kurzes Feedback)
         if self.toast_text:
             toast_font = pygame.font.Font(None, config.FONT_SIZE_MEDIUM)
             toast = toast_font.render(self.toast_text, True, config.COLOR_WHITE)

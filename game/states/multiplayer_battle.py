@@ -1,7 +1,7 @@
 # multiplayer_battle.py
 """
 Multiplayer Kampf-State
-Spieler vs Spieler über WebSocket (Server ist "Source of Truth")
+Spieler vs Spieler über WebSocket
 """
 
 from pgzero.rect import Rect
@@ -22,12 +22,13 @@ class MultiplayerBattleState(SharedBattleState):
     def __init__(self, game_manager):
         super().__init__(game_manager)
 
+        # WebSocket
         self.ws = self.game_manager.ws
 
         self.host = (mconfig.ROLE == "host")
         self.role = "host" if self.host else "guest"
 
-        # Gegnerboard (Fog-of-war)
+        # Gegnerboard
         self.opponent_board = Board(config.COMPUTER_GRID_X, config.GRID_OFFSET_Y, "Opponent")
 
         self.player_turn: bool = False
@@ -35,28 +36,28 @@ class MultiplayerBattleState(SharedBattleState):
         self.winner = None
         self.message = "WAITING FOR GAME START..."
 
+        self.game_over_timer = None
+        self.game_over_delay = config.BATTLE_GAME_OVER_DELAY
+
         initial_turn = getattr(self.game_manager, "mp_turn", None)
         if isinstance(initial_turn, str) and initial_turn in ("host", "guest"):
             self._set_turn(initial_turn)
         else:
             self.message = "WAITING FOR GAME START... (no turn)"
 
-    # ---------------- Turn / Marking helpers ----------------
 
+    # ------------------------------
+    # Handle events
+    # ------------------------------
     def _set_turn(self, turn: str):
         self.player_turn = (turn == self.role)
-        self.message = "YOUR TURN - SELECT TARGET" if self.player_turn else "OPPONENT TURN..."
+        self.message = "Du bist dran - Mache einen Zug" if self.player_turn else "Dein Gegner ist dran..."
 
     def _mark_opponent_cell(self, row: int, col: int, hit: bool, keep_napalm: bool = True):
-        """
-        Setzt echten Shot-Status (HIT/MISS) auf Fog-Board.
-        Für Napalm-only dürfen wir das NICHT aufrufen!
-        """
+        """Setzt HIT/MISS auf opponent_board"""
         cell = self.opponent_board.get_cell(row, col)
         if not cell or cell.is_shot():
             return
-
-
 
         cell.scan_marked = False
         cell.scan_found_ship = False
@@ -68,6 +69,7 @@ class MultiplayerBattleState(SharedBattleState):
         cell.status = CELL_HIT if hit else CELL_MISS
 
     def _apply_destroyed_cells_on_opponent(self, destroyed_cells):
+        """Markiert zerstörte Schiffe auf opponent_board"""
         if not isinstance(destroyed_cells, list):
             return
         for rc in destroyed_cells:
@@ -81,10 +83,6 @@ class MultiplayerBattleState(SharedBattleState):
                 cell.mark_destroyed()
 
     def _apply_incoming_strike_on_player(self, row: int, col: int, hit: bool, napalm: bool = False, napalm_only: bool = False):
-        """
-        Wichtig:
-        - napalm_only=True heißt: nur markieren, NICHT shoot() (sonst wäre es ein Schuss)
-        """
         cell = self.player_board.get_cell(row, col)
         if not cell:
             return
@@ -99,10 +97,18 @@ class MultiplayerBattleState(SharedBattleState):
             cell.napalm_marked = True
         self._spawn_effects(self.player_board, row, col, hit2)
 
-    # ------------------------------
-    # websocket processing
-    # ------------------------------
+    def _use_guided_missile(self):
+        if self.abilities["guided"]["charges"] <= 0:
+            return
+        self.abilities["guided"]["charges"] = 0
+        self._send_ability("guided")
+        self.selected_ability = None
+        self.message = f"{self._ability_display_name('guided')} SENT..."
 
+
+    # ------------------------------
+    # apply result
+    # ------------------------------
     def _apply_shot_result(self, msg: dict):
         by = msg.get("by")
         x = msg.get("x")
@@ -179,7 +185,7 @@ class MultiplayerBattleState(SharedBattleState):
         if isinstance(next_turn, str) and next_turn in ("host", "guest"):
             self._set_turn(next_turn)
 
-        # Startzelle Napalm optisch markieren (nur Overlay)
+        # Startzelle Napalm optisch markieren
         fire_started = bool(msg.get("fire_started"))
         origin = msg.get("fire_origin")
         if fire_started and isinstance(origin, dict):
@@ -217,13 +223,11 @@ class MultiplayerBattleState(SharedBattleState):
 
         self.message = "SONAR COMPLETE"
 
+
+    # ------------------------------
+    # napalm fire
+    # ------------------------------
     def _apply_fire_tick(self, msg: dict):
-        """
-        Server:
-          {"type":"fire_tick","results":[
-            {"target_role":"guest","row":..,"col":..,"hit":..,"destroyed":..,"destroyed_cells":[...],"napalm_only":bool}
-          ]}
-        """
         results = msg.get("results", [])
         if not isinstance(results, list):
             return
@@ -246,7 +250,7 @@ class MultiplayerBattleState(SharedBattleState):
                 continue
 
             if target_role != self.role:
-                # Feuer trifft Gegner (Fog-board)
+                # Feuer trifft Gegner
                 cell = self.opponent_board.get_cell(row, col)
                 if cell:
                     cell.napalm_marked = True
@@ -260,21 +264,31 @@ class MultiplayerBattleState(SharedBattleState):
                     self._apply_destroyed_cells_on_opponent(destroyed_cells)
 
             else:
-                # Feuer trifft dich
+                # Feuer trifft Player
                 self._apply_incoming_strike_on_player(
                     row, col, hit,
                     napalm=True,
                     napalm_only=napalm_only
                 )
 
+
+    # ------------------------------
+    # game over
+    # ------------------------------
     def _game_over(self, winner):
         if isinstance(winner, str) and winner in ("host", "guest"):
             self.game_manager.winner = "Player" if winner == self.role else "Opponent"
             mconfig.set_game(winner=winner)
-        self.game_manager.change_state(config.STATE_GAME_OVER)
+        self.game_over_timer = self.game_over_delay
 
+
+    # ------------------------------
+    # websocket processing / send
+    # ------------------------------
     def _process_ws_messages(self):
         while True:
+            if self.game_over_timer is not None:
+                return
             msg = self.ws.poll()
             if msg is None:
                 break
@@ -315,14 +329,6 @@ class MultiplayerBattleState(SharedBattleState):
                 case "error":
                     self.message = msg.get("detail", "SERVER ERROR")
 
-    # ------------------------------
-    # Input / Update
-    # ------------------------------
-
-    def _update_pipeline(self, dt, mouse_pos):
-        self.particles.update(dt)
-        self._process_ws_messages()
-
     def _send_ability(self, ability: str, row: int | None = None, col: int | None = None):
         if ability == "guided":
             self.ws.send_json({"type": "ability", "ability": "guided"})
@@ -331,14 +337,22 @@ class MultiplayerBattleState(SharedBattleState):
             return
         self.ws.send_json({"type": "ability", "ability": ability, "x": col, "y": row})
 
-    def _use_guided_missile(self):
-        if self.abilities["guided"]["charges"] <= 0:
-            return
-        self.abilities["guided"]["charges"] = 0
-        self._send_ability("guided")
-        self.selected_ability = None
-        self.message = f"{self._ability_display_name('guided')} SENT..."
 
+    # ------------------------------
+    # Update
+    # ------------------------------
+    def _update_pipeline(self, dt, mouse_pos):
+        if self.game_over_timer is not None:
+            self.game_over_timer -= dt
+            if self.game_over_timer <= 0:
+                self.game_manager.change_state(config.STATE_GAME_OVER)
+        self.particles.update(dt)
+        self._process_ws_messages()
+
+
+    # ------------------------------
+    # player events
+    # ------------------------------
     def _player_shoot(self, row, col):
         cell = self.opponent_board.get_cell(row, col)
         if not cell or cell.is_shot():
@@ -364,9 +378,12 @@ class MultiplayerBattleState(SharedBattleState):
         self._send_ability("napalm", row=row, col=col)
         self.message = f"{self._ability_display_name('napalm')} SENT..."
 
+
     # ------------------------------
     # Draw
     # ------------------------------
+    def draw(self, screen):
+        super().draw(screen)
 
     def _draw_board(self, screen, board, show_ships=True, is_enemy=False):
         theme = theme_manager.current
@@ -400,6 +417,3 @@ class MultiplayerBattleState(SharedBattleState):
                       config.BATTLE_LABEL_FONT_SIZE, label_color)
             draw_text(screen, chr(65 + i), board.x_offset + i * config.CELL_SIZE + config.CELL_SIZE // 2,
                       board.y_offset - 30, config.BATTLE_LABEL_FONT_SIZE, label_color, center=True)
-
-    def draw(self, screen):
-        super().draw(screen)
