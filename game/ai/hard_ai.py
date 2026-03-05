@@ -128,7 +128,7 @@ class HardComputerAI(NormalComputerAI):
         return False
 
     def _has_open_targets(self, board):
-        #prüft auf sonar marks oder undestroyte ships
+        # prüft auf sonar marks oder undestroyte ships
         if self.known_ship_cells:
             return True
 

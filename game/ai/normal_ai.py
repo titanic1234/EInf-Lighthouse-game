@@ -6,7 +6,7 @@ from game.ai.base_ai import BaseComputerAI
 
 
 class NormalComputerAI(BaseComputerAI):
-    DEFAULT_ABILITIES = {"airstrike": 1, "guided": 1, "sonar": 1, "napalm": 1,}
+    DEFAULT_ABILITIES = {"airstrike": 1, "guided": 1, "sonar": 1, "napalm": 1}
 
     def __init__(self):
         super().__init__()

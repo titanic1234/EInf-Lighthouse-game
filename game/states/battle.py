@@ -32,6 +32,7 @@ class BattleState(SharedBattleState):
         self.game_over_timer = None
 
         self.active_fires = []
+        self.computer_active_fires = []
 
 
     # ------------------------------
@@ -236,39 +237,6 @@ class BattleState(SharedBattleState):
 
         self._check_game_over_after_player_action(hit, force_end_turn=True, preserve_message=True)
 
-    def _progress_fires(self):
-        if not self.active_fires:
-            return False
-
-        hit_any = False
-        for fire in self.active_fires:
-            if fire["turns_left"] <= 0:
-                continue
-
-            candidates = set()
-            for row, col in fire["burning_cells"]:
-                for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                    nr, nc = row + dr, col + dc
-                    if (nr, nc) in fire["expanded_to"]:
-                        continue
-                    if self.computer_board.get_cell(nr, nc):
-                        candidates.add((nr, nc))
-
-            spread_targets = random.sample(list(candidates), min(3, len(candidates))) if candidates else []
-            new_burning = set()
-            for tr, tc in spread_targets:
-                fire["expanded_to"].add((tr, tc))
-                new_burning.add((tr, tc))
-                hit, _ = self._shoot_with_napalm_rules(tr, tc)
-                if hit:
-                    hit_any = True
-
-            fire["burning_cells"].update(new_burning)
-            fire["turns_left"] -= 1
-
-        self.active_fires = [f for f in self.active_fires if f["turns_left"] > 0]
-        return hit_any
-
     def _player_shoot(self, row, col):
         """Spieler schiesst"""
         theme = theme_manager.current
@@ -296,8 +264,8 @@ class BattleState(SharedBattleState):
     # End Game
     # ------------------------------
     def _check_game_over_after_player_action(self, hit, force_end_turn=False, preserve_message=False):
-        fire_hit = self._progress_fires()
-        any_hit = hit or fire_hit
+        # endet player turn, spreaded napalm, setzt end game
+        self._progress_fires()
 
         if self.computer_board.all_ships_destroyed():
             self.game_over = True
@@ -305,7 +273,7 @@ class BattleState(SharedBattleState):
             self._end_game()
             return
 
-        if force_end_turn or not any_hit:
+        if force_end_turn or not hit:
             self.player_turn = False
             if preserve_message:
                 self.message = f"{self.message} - {theme_manager.current.text_computer_turn}"
@@ -323,6 +291,13 @@ class BattleState(SharedBattleState):
     # ------------------------------
     def _computer_turn(self):
         """Computer macht seinen Zug"""
+        fire_hit = self._progress_computer_fires()
+        if self.player_board.all_ships_destroyed():
+            self.game_over = True
+            self.winner = "Computer"
+            self._end_game()
+            return
+
         action = self.ai.choose_action(self.player_board)
         action_type = action.get("type", "shoot")
 
@@ -436,13 +411,18 @@ class BattleState(SharedBattleState):
         self._spawn_effects(self.player_board, row, col, hit)
         return row, col, hit, destroyed, ship
 
-    def _computer_napalm(self, row, col):
+    def _computer_shoot_with_napalm_rules(self, row, col):
         cell = self.player_board.get_cell(row, col)
         if not cell or cell.is_shot():
-            row, col = self.ai.get_next_shot(self.player_board)
-            cell = self.player_board.get_cell(row, col)
+            return False, False, None
 
         if not cell.has_ship():
+            cell.napalm_marked = True
+            self.ai.tried_positions.add((row, col))
+            self._spawn_effects(self.player_board, row, col, False)
+            return False, False, None
+
+        if cell.ship and cell.ship.name.split(" #", 1)[0] in ("U-Boot", "Schaluppe"):
             cell.napalm_marked = True
             self.ai.tried_positions.add((row, col))
             self._spawn_effects(self.player_board, row, col, False)
@@ -451,6 +431,53 @@ class BattleState(SharedBattleState):
         hit, destroyed, ship = self.player_board.shoot(row, col)
         self.ai.register_shot_result(row, col, hit, destroyed, ship)
         self._spawn_effects(self.player_board, row, col, hit)
+        return hit, destroyed, ship
+
+    def _progress_computer_fires(self):
+        if not self.computer_active_fires:
+            return False
+
+        hit_any = False
+        for fire in self.computer_active_fires:
+            if fire["turns_left"] <= 0:
+                continue
+
+            candidates = set()
+            for row, col in fire["burning_cells"]:
+                for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    nr, nc = row + dr, col + dc
+                    if (nr, nc) in fire["expanded_to"]:
+                        continue
+                    if self.player_board.get_cell(nr, nc):
+                        candidates.add((nr, nc))
+
+            spread_targets = random.sample(list(candidates), min(3, len(candidates))) if candidates else []
+            new_burning = set()
+            for tr, tc in spread_targets:
+                fire["expanded_to"].add((tr, tc))
+                new_burning.add((tr, tc))
+                hit, _, _ = self._computer_shoot_with_napalm_rules(tr, tc)
+                if hit:
+                    hit_any = True
+
+            fire["burning_cells"].update(new_burning)
+            fire["turns_left"] -= 1
+
+        self.computer_active_fires = [f for f in self.computer_active_fires if f["turns_left"] > 0]
+        return hit_any
+
+    def _computer_napalm(self, row, col):
+        cell = self.player_board.get_cell(row, col)
+        if not cell or cell.is_shot():
+            row, col = self.ai.get_next_shot(self.player_board)
+
+        hit, destroyed, ship = self._computer_shoot_with_napalm_rules(row, col)
+        fire = {
+            "turns_left": 3,
+            "burning_cells": {(row, col)},
+            "expanded_to": {(row, col)},
+        }
+        self.computer_active_fires.append(fire)
         return hit, destroyed, ship
 
 

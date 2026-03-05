@@ -180,6 +180,7 @@ class BaseComputerAI:
         hit_clusters = self._get_hit_clusters()
         if not hit_clusters and not self.possible_targets:
             self.mode = self.MODE_HUNT
+            return
 
         self.mode = self.MODE_TARGET
         for cluster in sorted(hit_clusters, key=len, reverse=True):
