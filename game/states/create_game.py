@@ -49,7 +49,6 @@ class CreateGameState(MultiplayerLobbyState):
         self.toast_timer = duration
 
     def _copy_room_code(self):
-        # Nur kopieren, wenn sinnvoller Code da ist
         code = (self.room_text or "").strip()
         if not code or code.lower() == "waiting...":
             self._show_copy_toast("Noch kein Code verfügbar")
@@ -76,7 +75,6 @@ class CreateGameState(MultiplayerLobbyState):
             if self.toast_timer <= 0:
                 self.toast_text = ""
 
-        # room_text live nachziehen, falls mconfig.CODE später gesetzt wird
         if mconfig.CODE is not None:
             self.room_text = str(mconfig.CODE)
 

@@ -1,3 +1,4 @@
+# battle.py
 """
 Kampf-State
 Spieler vs Computer
@@ -38,6 +39,10 @@ class BattleState(SharedBattleState):
 
         self.active_fires = []
 
+
+    # ------------------------------
+    # Update
+    # ------------------------------
     def _update_pipeline(self, dt, mouse_pos):
         if self.game_over_timer is not None:
             self.game_over_timer -= dt
@@ -55,6 +60,9 @@ class BattleState(SharedBattleState):
                 self.computer_delay = 0
 
 
+    # ------------------------------
+    # Abilities
+    # ------------------------------
     def _shoot_with_napalm_rules(self, row, col):
         """U-Boot ist immun, deshalb anderer Marker statt miss"""
         cell = self.computer_board.get_cell(row, col)
@@ -82,6 +90,71 @@ class BattleState(SharedBattleState):
             self.game_manager.shots_hit += 1
         return hit, destroyed
 
+    def _use_guided_missile(self):
+        candidates = []
+        for row in range(config.GRID_SIZE):
+            for col in range(config.GRID_SIZE):
+                cell = self.computer_board.get_cell(row, col)
+                if cell and cell.has_ship() and not cell.is_shot():
+                    candidates.append((row, col))
+
+        if not candidates: # sollte nicht passieren
+            self.message = f"KEIN GÜLTIGES ZIEL FÜR {self._ability_display_name('guided')}"
+            return
+
+        row, col = random.choice(candidates)
+        self.abilities["guided"]["charges"] = 0
+
+        self.game_manager.shots_fired += 1
+        hit, destroyed, _ = self.computer_board.shoot(row, col)
+        self._spawn_effects(self.computer_board, row, col, hit)
+        if hit:
+            self.game_manager.shots_hit += 1
+
+        if destroyed:
+            self.message = f"{self._ability_display_name('guided')}: ZIEL VERSENKT!"
+        else:
+            self.message = f"{self._ability_display_name('guided')} HAT BEI ({row + 1}, {col + 1}) GETROFFEN!"
+
+        self._check_game_over_after_player_action(hit)
+
+    def _progress_fires(self):
+        if not self.active_fires:
+            return False
+
+        hit_any = False
+        for fire in self.active_fires:
+            if fire["turns_left"] <= 0:
+                continue
+
+            candidates = set()
+            for row, col in fire["burning_cells"]:
+                for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    nr, nc = row + dr, col + dc
+                    if (nr, nc) in fire["expanded_to"]:
+                        continue
+                    if self.computer_board.get_cell(nr, nc):
+                        candidates.add((nr, nc))
+
+            spread_targets = random.sample(list(candidates), min(3, len(candidates))) if candidates else []
+            new_burning = set()
+            for tr, tc in spread_targets:
+                fire["expanded_to"].add((tr, tc))
+                new_burning.add((tr, tc))
+                hit, _ = self._shoot_with_napalm_rules(tr, tc)
+                if hit:
+                    hit_any = True
+
+            fire["burning_cells"].update(new_burning)
+            fire["turns_left"] -= 1
+
+        self.active_fires = [f for f in self.active_fires if f["turns_left"] > 0]
+        return hit_any
+
+
+    # ------------------------------
+    # Player Functions
+    # ------------------------------
     def _player_airstrike(self, center_row, center_col):
         """Fuehrt einen Airstrike (+ muster) aus."""
         self.abilities["airstrike"]["charges"] = 0
@@ -123,34 +196,6 @@ class BattleState(SharedBattleState):
             self.message = theme_manager.current.text_airstrike_miss
 
         self._check_game_over_after_player_action(hit_any)
-
-    def _use_guided_missile(self):
-        candidates = []
-        for row in range(config.GRID_SIZE):
-            for col in range(config.GRID_SIZE):
-                cell = self.computer_board.get_cell(row, col)
-                if cell and cell.has_ship() and not cell.is_shot():
-                    candidates.append((row, col))
-
-        if not candidates: # sollte nicht passieren
-            self.message = f"KEIN GÜLTIGES ZIEL FÜR {self._ability_display_name('guided')}"
-            return
-
-        row, col = random.choice(candidates)
-        self.abilities["guided"]["charges"] = 0
-
-        self.game_manager.shots_fired += 1
-        hit, destroyed, _ = self.computer_board.shoot(row, col)
-        self._spawn_effects(self.computer_board, row, col, hit)
-        if hit:
-            self.game_manager.shots_hit += 1
-
-        if destroyed:
-            self.message = f"{self._ability_display_name('guided')}: ZIEL VERSENKT!"
-        else:
-            self.message = f"{self._ability_display_name('guided')} HAT BEI ({row + 1}, {col + 1}) GETROFFEN!"
-
-        self._check_game_over_after_player_action(hit)
 
     def _player_sonar(self, center_row, center_col):
         self.abilities["sonar"]["charges"] = 0
@@ -196,39 +241,6 @@ class BattleState(SharedBattleState):
 
         self._check_game_over_after_player_action(hit, force_end_turn=True, preserve_message=True)
 
-    def _progress_fires(self):
-        if not self.active_fires:
-            return False
-
-        hit_any = False
-        for fire in self.active_fires:
-            if fire["turns_left"] <= 0:
-                continue
-
-            candidates = set()
-            for row, col in fire["burning_cells"]:
-                for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                    nr, nc = row + dr, col + dc
-                    if (nr, nc) in fire["expanded_to"]:
-                        continue
-                    if self.computer_board.get_cell(nr, nc):
-                        candidates.add((nr, nc))
-
-            spread_targets = random.sample(list(candidates), min(3, len(candidates))) if candidates else []
-            new_burning = set()
-            for tr, tc in spread_targets:
-                fire["expanded_to"].add((tr, tc))
-                new_burning.add((tr, tc))
-                hit, _ = self._shoot_with_napalm_rules(tr, tc)
-                if hit:
-                    hit_any = True
-
-            fire["burning_cells"].update(new_burning)
-            fire["turns_left"] -= 1
-
-        self.active_fires = [f for f in self.active_fires if f["turns_left"] > 0]
-        return hit_any
-
     def _player_shoot(self, row, col):
         """Spieler schiesst"""
         theme = theme_manager.current
@@ -251,6 +263,10 @@ class BattleState(SharedBattleState):
 
         self._check_game_over_after_player_action(hit)
 
+
+    # ------------------------------
+    # End Game
+    # ------------------------------
     def _check_game_over_after_player_action(self, hit, force_end_turn=False, preserve_message=False):
         fire_hit = self._progress_fires()
         any_hit = hit or fire_hit
@@ -268,6 +284,15 @@ class BattleState(SharedBattleState):
             else:
                 self.message = theme_manager.current.text_computer_turn
 
+    def _end_game(self):
+        """Beendet das Spiel"""
+        self.game_manager.winner = self.winner
+        self.game_over_timer = self.game_over_delay
+
+
+    # ------------------------------
+    # Computer
+    # ------------------------------
     def _computer_turn(self):
         """Computer macht seinen Zug"""
         action = self.ai.choose_action(self.player_board)
@@ -400,11 +425,10 @@ class BattleState(SharedBattleState):
         self._spawn_effects(self.player_board, row, col, hit)
         return hit, destroyed, ship
 
-    def _end_game(self):
-        """Beendet das Spiel"""
-        self.game_manager.winner = self.winner
-        self.game_over_timer = self.game_over_delay
 
+    # ------------------------------
+    # Draw
+    # ------------------------------
     def _draw_statistics(self, screen):
         """Zeichnet Statistiken in modernen Panels"""
         y = config.GRID_OFFSET_Y + config.GRID_SIZE * config.CELL_SIZE + config.BATTLE_STAT_PANEL_OFFSET_Y

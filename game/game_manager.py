@@ -1,3 +1,4 @@
+# game_manager.py
 """
 Game-Manager
 Verwaltet alle Spielzustände (States) und koordiniert das Spiel
@@ -60,6 +61,9 @@ class GameManager:
 
         self.change_state(STATE_MENU)
 
+    # ------------------------------
+    # Change State
+    # ------------------------------
     def change_state(self, new_state_name):
         self.current_state_name = new_state_name
         state_class = self.STATE_MAP.get(new_state_name)
@@ -67,6 +71,10 @@ class GameManager:
             raise ValueError(f"Unbekannter State: {new_state_name}")
         self.current_state = state_class(self)
 
+
+    # ------------------------------
+    # Reset complete Game
+    # ------------------------------
     def reset_game(self):
         self.player_board = None
         self.winner = None
@@ -75,14 +83,14 @@ class GameManager:
         self.mp_turn = None
         mp_reset()
 
+
+    # ------------------------------
+    # Events / Update
+    # ------------------------------
     def update(self, dt, mouse_pos):
         self.time_elapsed += dt
         if self.current_state:
             self.current_state.update(dt, mouse_pos)
-
-    def draw(self, screen):
-        if self.current_state:
-            self.current_state.draw(screen)
 
     def on_mouse_down(self, pos, button):
         if self.current_state:
@@ -91,3 +99,11 @@ class GameManager:
     def on_key_down(self, key, mod=0):
         if self.current_state:
             self.current_state.on_key_down(key, mod)
+
+
+    # ------------------------------
+    # Draw
+    # ------------------------------
+    def draw(self, screen):
+        if self.current_state:
+            self.current_state.draw(screen)

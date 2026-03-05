@@ -1,6 +1,6 @@
+# game_over.py
 """
 Game-Over-State
-Zeigt Gewinner und Optionen an
 """
 
 import game.config as config
@@ -13,19 +13,18 @@ class GameOverState(BaseState):
     """Game-Over-Screen"""
 
     def __init__(self, game_manager):
-        """
-        Initialisiert den Game-Over-Screen
 
-        Args:
-            game_manager: Referenz zum GameManager
-        """
         super().__init__(game_manager)
         self.winner = game_manager.winner
         self.buttons = []
         self._create_buttons()
 
+
+    # ------------------------------
+    # Create Buttons
+    # ------------------------------
     def _create_buttons(self):
-        """Erstellt die Buttons"""
+
         center_x = config.WINDOW_WIDTH // 2
         start_y = config.WINDOW_HEIGHT // 2 + 50
 
@@ -47,8 +46,11 @@ class GameOverState(BaseState):
                 )
             )
 
+
+    # ------------------------------
+    # Button clicked
+    # ------------------------------
     def _new_game(self):
-        """Startet ein neues Spiel"""
         multiplayer = self.game_manager.ws.is_connected()
         self.game_manager.ws.stop()
         self.game_manager.reset_game()
@@ -57,49 +59,36 @@ class GameOverState(BaseState):
         else:
             self.game_manager.change_state(config.STATE_PLACEMENT)
 
-
-
     def _main_menu(self):
-        """Zurueck zum Hauptmenue"""
         self.game_manager.ws.stop()
         self.game_manager.reset_game()
         self.game_manager.change_state(config.STATE_MENU)
 
     def _quit_game(self):
-        """Beendet das Spiel"""
         import sys
         sys.exit()
 
-    def update(self, dt, mouse_pos):
-        """
-        Aktualisiert den Game-Over-Screen
 
-        Args:
-            dt: Delta-Zeit
-            mouse_pos: Tuple (x, y) der Mausposition
-        """
+    # ------------------------------
+    # Events
+    # ------------------------------
+    def update(self, dt, mouse_pos):
         mouse_x, mouse_y = mouse_pos
         for button in self.buttons:
             button.update(dt, mouse_x, mouse_y)
 
     def on_mouse_down(self, pos, button):
-        """
-        Behandelt Mausklicks
-
-        Args:
-            pos: Tuple (x, y)
-            button: Maustaste
-        """
         if button == 1:
             for btn in self.buttons:
                 if btn.hovered:
                     btn.click()
                     break
 
+
+    # ------------------------------
+    # Draw
+    # ------------------------------
     def draw(self, screen):
-        """
-        Zeichnet den Game-Over-Screen
-        """
         theme = theme_manager.current
         draw_gradient_background(screen, time_value=self.game_manager.time_elapsed)
 
@@ -153,7 +142,3 @@ class GameOverState(BaseState):
         # Buttons
         for button in self.buttons:
             button.draw(screen)
-
-    def on_resize(self, width, height):
-        self.buttons = []
-        self._create_buttons()

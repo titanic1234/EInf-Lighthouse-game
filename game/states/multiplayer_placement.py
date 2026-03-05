@@ -40,12 +40,11 @@ class MultiplayerPlacementState(SharedPlacementState):
         self.host = (mconfig.ROLE == "host")
 
         # Board-Upload state
-        self.board_sent = False  # set_board schon gesendet?
+        self.board_sent = False
 
         # Buttons
         self.ready_button = self.build_primary_action_button("BEREIT", self._on_ready_clicked, 30)
 
-        # Optional: nur sinnvoll, wenn Server diese Nachricht auch verarbeitet
         if self.host:
             self.ws.send_json({"type": "host_name", "name": mconfig.NAME})
 
