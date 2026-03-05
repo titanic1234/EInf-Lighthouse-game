@@ -1,8 +1,4 @@
-# battle.py
-"""
-Kampf-State
-Spieler vs Computer
-"""
+"""PvE battle"""
 
 import random
 from pgzero.rect import Rect
@@ -15,10 +11,8 @@ from game.states.shared_battle import SharedBattleState
 
 
 class BattleState(SharedBattleState):
-    """Kampf-Phase: Spieler gegen Computer"""
 
     def __init__(self, game_manager):
-        """Initialisiert die Kampfphase"""
         super().__init__(game_manager)
 
         self.computer_board = Board(config.COMPUTER_GRID_X, config.GRID_OFFSET_Y, "Computer")
@@ -52,19 +46,19 @@ class BattleState(SharedBattleState):
         if self.game_over:
             return
 
-        # Computer-Zug mit Verzoegerung
+        # ai zug mit delay
         if not self.player_turn:
             self.computer_delay += dt
             if self.computer_delay >= self.computer_delay_time:
-                self._computer_turn()
                 self.computer_delay = 0
+                self._computer_turn()
 
 
     # ------------------------------
     # Abilities
     # ------------------------------
     def _shoot_with_napalm_rules(self, row, col):
-        """U-Boot ist immun, deshalb anderer Marker statt miss"""
+        #hit/miss check für napalm,  2x1 ist immun
         cell = self.computer_board.get_cell(row, col)
         if not cell or cell.is_shot():
             return False, False
@@ -91,6 +85,7 @@ class BattleState(SharedBattleState):
         return hit, destroyed
 
     def _use_guided_missile(self):
+        # shoot random feld mit gegn.
         candidates = []
         for row in range(config.GRID_SIZE):
             for col in range(config.GRID_SIZE):
@@ -156,14 +151,13 @@ class BattleState(SharedBattleState):
     # Player Functions
     # ------------------------------
     def _player_airstrike(self, center_row, center_col):
-        """Fuehrt einen Airstrike (+ muster) aus."""
+        # airstrike, shots in + ums feld
         self.abilities["airstrike"]["charges"] = 0
         self.selected_ability = None
 
         hit_any = False
         destroyed_any = False
 
-        # Airstrike visual effect at center
         coords = [
             (center_row, center_col),
             (center_row - 1, center_col),
@@ -198,6 +192,7 @@ class BattleState(SharedBattleState):
         self._check_game_over_after_player_action(hit_any)
 
     def _player_sonar(self, center_row, center_col):
+        # 3x3 sonar, setzt marks ohne shot
         self.abilities["sonar"]["charges"] = 0
         self.selected_ability = None
 
@@ -240,6 +235,39 @@ class BattleState(SharedBattleState):
             self.message = f"{self._ability_display_name('napalm')} ENTZÜNDET"
 
         self._check_game_over_after_player_action(hit, force_end_turn=True, preserve_message=True)
+
+    def _progress_fires(self):
+        if not self.active_fires:
+            return False
+
+        hit_any = False
+        for fire in self.active_fires:
+            if fire["turns_left"] <= 0:
+                continue
+
+            candidates = set()
+            for row, col in fire["burning_cells"]:
+                for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    nr, nc = row + dr, col + dc
+                    if (nr, nc) in fire["expanded_to"]:
+                        continue
+                    if self.computer_board.get_cell(nr, nc):
+                        candidates.add((nr, nc))
+
+            spread_targets = random.sample(list(candidates), min(3, len(candidates))) if candidates else []
+            new_burning = set()
+            for tr, tc in spread_targets:
+                fire["expanded_to"].add((tr, tc))
+                new_burning.add((tr, tc))
+                hit, _ = self._shoot_with_napalm_rules(tr, tc)
+                if hit:
+                    hit_any = True
+
+            fire["burning_cells"].update(new_burning)
+            fire["turns_left"] -= 1
+
+        self.active_fires = [f for f in self.active_fires if f["turns_left"] > 0]
+        return hit_any
 
     def _player_shoot(self, row, col):
         """Spieler schiesst"""
