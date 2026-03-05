@@ -1,4 +1,3 @@
-
 class BaseState:
     """Parent class für states"""
 
