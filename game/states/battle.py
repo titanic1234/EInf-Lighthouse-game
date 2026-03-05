@@ -80,6 +80,7 @@ class BattleState(SharedBattleState):
             return False, False
 
         hit, destroyed, _ = self.computer_board.shoot(row, col)
+        cell.napalm_marked = True
         self._spawn_effects(self.computer_board, row, col, hit)
         if hit:
             self.game_manager.shots_hit += 1
@@ -433,6 +434,7 @@ class BattleState(SharedBattleState):
             return False, False, None
 
         hit, destroyed, ship = self.player_board.shoot(row, col)
+        cell.napalm_marked = True
         self.ai.register_shot_result(row, col, hit, destroyed, ship)
         self._spawn_effects(self.player_board, row, col, hit)
         return hit, destroyed, ship

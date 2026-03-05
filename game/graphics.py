@@ -10,15 +10,6 @@ from game.theme import theme_manager
 _SHIP_IMAGE_CACHE = {}
 _SHIP_RENDER_CACHE = {}
 
-_THEME_STATUS_ICON_MAP = {
-    "MODERN": {
-        "napalm": "napalm.png",
-    },
-    "PIRATE": {
-        "napalm": "griechisches_feuer.png",
-    },
-}
-
 _STATUS_ICON_CACHE = {}
 _UI_SPRITE_CACHE = {}
 
@@ -93,30 +84,6 @@ def scale_sprite_to_cell(sprite_surface, cell_size, fill_ratio=1.0):
     scaled_w = max(1, int(round(src_w * scale_factor)))
     scaled_h = max(1, int(round(src_h * scale_factor)))
     return pygame.transform.smoothscale(sprite_surface, (scaled_w, scaled_h))
-
-def _get_status_icon(icon_name):
-    # lädt theme speziefisches ability icon, cached beim 1. mal (cache logik via AI-chatbot)
-    theme_name = theme_manager.current.name
-    theme_filename = _THEME_STATUS_ICON_MAP.get(theme_name, {}).get(icon_name)
-
-    if not theme_filename:
-        return None
-
-    cache_key = ("status", theme_filename)
-    if cache_key not in _STATUS_ICON_CACHE:
-        icon_path = os.path.join("images", theme_filename)
-        if not os.path.exists(icon_path):
-            return None
-        try:
-            _STATUS_ICON_CACHE[cache_key] = pygame.image.load(icon_path).convert_alpha()
-        except pygame.error:
-            return None
-
-        icon_surface = _STATUS_ICON_CACHE.get(cache_key)
-        if icon_surface is not None:
-            return icon_surface
-
-    return None
 
 _THEME_SHIP_IMAGE_MAP = {
     "MODERN": {
@@ -311,7 +278,7 @@ def draw_grid_cell(screen, x, y, cell, is_enemy=False, show_ships=True, ws_conne
             screen.blit(scan_scaled, scan_scaled.get_rect(center=cell_rect.center))
 
     if cell.napalm_marked:
-        icon = _get_status_icon("napalm")
+        icon = _get_ui_sprite("napalm")
         if icon:
             icon_surf = scale_sprite_to_cell(icon, config.CELL_SIZE, fill_ratio=0.78)
             screen.blit(icon_surf, icon_surf.get_rect(center=cell_rect.center))
