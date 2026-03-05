@@ -80,6 +80,7 @@ class GameManager:
         self.winner = None
         self.shots_fired = 0
         self.shots_hit = 0
+        self.ws = None
         self.mp_turn = None
         mp_reset()
 
