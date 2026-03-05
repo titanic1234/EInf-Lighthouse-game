@@ -58,8 +58,7 @@ class GameOverState(BaseState):
             if multiplayer:
                 self.game_manager.change_state(config.STATE_MULTIPLAYER_MENU)
         except Exception:
-            pass
-        else:
+            self.game_manager.reset_game()
             self.game_manager.change_state(config.STATE_PLACEMENT)
 
     def _main_menu(self):
