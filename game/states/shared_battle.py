@@ -1,5 +1,3 @@
-# shared_battle.py
-
 """Gemeinsame Battle-Logik für Singleplayer und Multiplayer."""
 
 import os
@@ -19,12 +17,12 @@ from game.theme import theme_manager
 
 
 class SharedBattleState(BaseState):
-    """Gemeinsame UI/Input-Logik für Battle."""
-
     enemy_board_title = None
 
     def __init__(self, game_manager):
         super().__init__(game_manager)
+        self.game_over = None
+        self.player_turn = None
         self.player_board = self.game_manager.player_board
         self.particles = ParticleSystem()
 
@@ -97,6 +95,22 @@ class SharedBattleState(BaseState):
             "napalm": f"{self._ability_display_name('napalm')} AKTIV",
         }
         self.message = label.get(name, "SPEZIALFÄHIGKEIT AKTIV")
+
+    def _player_airstrike(self, row, col):
+        """Hook für subclasses"""
+
+    def _use_guided_missile(self):
+        """Hook für subclasses"""
+
+    def _player_sonar(self, row, col):
+        """Hook für subclasses"""
+
+    def _player_napalm(self, row, col):
+        """Hook für subclasses"""
+
+
+    def _player_shoot(self, row, col):
+        """Hook für subclasses"""
 
 
     # ------------------------------

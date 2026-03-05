@@ -1,4 +1,3 @@
-# shared_placement.py
 """Gemeinsame Placement-Logik für Singleplayer und Multiplayer."""
 
 
@@ -21,7 +20,6 @@ from game.theme import theme_manager
 
 
 class SharedPlacementState(BaseState):
-    """Gemeinsame UI/Input-Logik für Schiffsplatzierung."""
 
     title_text = "SCHIFFE PLATZIEREN"
     instruction_hint = "Linksklick: Schiff wählen/platzieren | R: rotieren"
@@ -44,6 +42,7 @@ class SharedPlacementState(BaseState):
     # Logic
     # ------------------------------
     def _create_ships(self):
+        # erstellt ships aus config liste
         for ship_type in config.SHIP_TYPES:
             ship_name, ship_length, ship_count = ship_type[:3]
             ship_shape = ship_type[3] if len(ship_type) > 3 else None
@@ -66,6 +65,7 @@ class SharedPlacementState(BaseState):
         return min_row, min_col, max_row, max_col
 
     def _get_preview_bounds(self, ship, row, col, orientation):
+        #dimensionen des preview ships in px
         min_row, min_col, max_row, max_col = self._get_ship_bounds(ship, row, col, orientation)
         x = self.player_board.x_offset + min_col * config.CELL_SIZE
         y = self.player_board.y_offset + min_row * config.CELL_SIZE
@@ -74,6 +74,7 @@ class SharedPlacementState(BaseState):
         return x, y, width, height
 
     def _pick_ship_from_board(self, pos):
+        #selected ein placed ship und removed es zum replacen
         cell_pos = self.player_board.get_cell_at_pos(pos[0], pos[1])
         if not cell_pos:
             return False
@@ -93,11 +94,11 @@ class SharedPlacementState(BaseState):
     # Hooks
     # ------------------------------
     def _handle_action_button_click(self, pos):
-        """Hook for subclasses."""
+        """Hook für subclasses."""
         return False
 
     def _update_action_buttons(self, dt, mouse_pos):
-        """Hook for subclasses."""
+        """Hook für subclasses."""
 
 
     # ------------------------------
@@ -130,6 +131,7 @@ class SharedPlacementState(BaseState):
         if self._handle_action_button_click(pos):
             return
 
+        #select angeclicktes ship
         for ship, item_rect in self.ship_list_item_rects:
             if item_rect.collidepoint(pos):
                 if self._is_ship_placed(ship):
@@ -141,6 +143,7 @@ class SharedPlacementState(BaseState):
         if not self.selected_ship and self._pick_ship_from_board(pos):
             return
 
+        # place ship ins grid
         if self.selected_ship and self.preview_position and self.placement_valid:
             row, col = self.preview_position
             if self.player_board.place_ship(self.selected_ship, row, col, self.current_orientation):
@@ -207,7 +210,7 @@ class SharedPlacementState(BaseState):
         self._draw_action_buttons(screen)
 
     def _draw_status_panels(self, screen):
-        """Hook for subclasses."""
+        """Hook für subclasses."""
 
     def _get_instruction_text(self):
         if self.selected_ship:
@@ -216,6 +219,7 @@ class SharedPlacementState(BaseState):
         return "WÄHLE EIN SCHIFF AUS DER LISTE ODER KLICKE EIN SCHIFF AUF DEM FELD"
 
     def _draw_progress(self, screen):
+        # draw x / max_ships platziert
         prog_rect = Rect(
             config.WINDOW_WIDTH - config.PLACEMENT_PROGRESS_PANEL_WIDTH - config.PLACEMENT_PROGRESS_PANEL_MARGIN_RIGHT,
             config.PLACEMENT_PROGRESS_PANEL_Y,
@@ -259,6 +263,7 @@ class SharedPlacementState(BaseState):
             self._draw_ship_sprite_preview(screen)
 
     def _draw_ship_list(self, screen):
+        # ships neben dem board zum placen
         x = self.player_board.x_offset + config.GRID_SIZE * config.CELL_SIZE + 50
         y = self.player_board.y_offset + 10
         draw_text(screen, "SCHIFFE", x, y - 36, config.PLACEMENT_SHIP_LIST_TITLE_FONT_SIZE, (150, 200, 255))
@@ -306,6 +311,7 @@ class SharedPlacementState(BaseState):
         draw_text(screen, text, toast_rect.centerx, toast_rect.centery, 30, theme.color_text_primary, center=True)
 
     def _draw_ship_sprite_preview(self, screen):
+        #preview image mit grid snap/maus folgend, transparent wenn placemen nicht valid
         if not self.selected_ship:
             return
 
@@ -339,7 +345,7 @@ class SharedPlacementState(BaseState):
             return
 
         preview_surface = transformed.copy()
-        preview_surface.set_alpha(210 if self.placement_valid else 130)
+        preview_surface.set_alpha(210 if self.placement_valid else 100)
         screen.blit(preview_surface, (x, y))
 
     # ------------------------------
