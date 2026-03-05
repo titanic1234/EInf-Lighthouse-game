@@ -1,3 +1,4 @@
+# ship.py
 """
 Ship-Klasse für Schiffe
 """
@@ -11,10 +12,6 @@ class Ship:
     def __init__(self, name, length, shape=None):
         """
         Initialisiert ein Schiff
-
-        Args:
-            name: Name des Schiffs (z.B. "Schlachtschiff")
-            length: Länge des Schiffs (Anzahl Zellen)
         """
         self.name = name
         self.length = length
@@ -42,18 +39,12 @@ class Ship:
     def is_destroyed(self):
         """
         Prüft, ob das Schiff versenkt wurde
-
-        Returns:
-            bool: True wenn versenkt, sonst False
         """
         return self.hits >= self.get_size()
 
     def get_coordinates(self, row=None, col=None, orientation=None):
         """
         Gibt alle Koordinaten zurück, die das Schiff belegt
-
-        Returns:
-            list: Liste von (row, col) Tupeln
         """
         if row is None:
             row = self.row

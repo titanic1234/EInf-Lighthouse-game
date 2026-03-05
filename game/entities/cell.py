@@ -1,3 +1,4 @@
+# cell.py
 """
 Cell-Klasse für einzelne Spielfeld-Zellen
 """
@@ -29,14 +30,6 @@ class Cell:
         """Prüft, ob die Zelle ein Schiff enthält"""
         return self.ship is not None
 
-    def is_hit(self):
-        """Prüft, ob die Zelle getroffen wurde"""
-        return self.status == CELL_HIT
-
-    def is_miss(self):
-        """Prüft, ob die Zelle ein Fehlschuss ist"""
-        return self.status == CELL_MISS
-
     def is_shot(self):
         """Prüft, ob auf diese Zelle bereits geschossen wurde"""
         return self.status in (CELL_HIT, CELL_MISS, CELL_DESTROYED)
@@ -49,9 +42,6 @@ class Cell:
     def shoot(self):
         """
         Schießt auf diese Zelle
-
-        Returns:
-            bool: True wenn getroffen, False wenn Fehlschuss
         """
         if self.is_shot():
             return False  # Bereits beschossen
