@@ -5,13 +5,13 @@ class BaseState:
         self.game_manager = game_manager
 
     def update(self, dt, mouse_pos):
-        """Wird pro Frame aufgerufen."""
+        pass
 
     def draw(self, screen):
         raise NotImplementedError("draw() muss in State-Klassen implementiert werden")
 
     def on_mouse_down(self, pos, button):
-        """Optionaler Mausklick-Handler."""
+        pass
 
     def on_key_down(self, key, mod=0):
-        """Optionaler Tastatur-Handler."""
+        pass
