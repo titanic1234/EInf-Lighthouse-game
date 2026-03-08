@@ -3,6 +3,11 @@
 import sys
 import os
 
+os.environ['SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS'] = '0' # Verhindert minimieren
+
+if hasattr(sys, '_MEIPASS'):
+    os.chdir(sys._MEIPASS)
+
 import pgzrun
 import pygame
 from pgzero.keyboard import keys
@@ -20,7 +25,6 @@ _start_check_connection_thread()
 game_manager = GameManager()
 mouse_position = (0, 0)
 
-os.environ['SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS'] = '0' # Verhindert minimieren
 
 # Wechsel Fullscree - Resizable
 def _set_window_mode(windowed: bool):
