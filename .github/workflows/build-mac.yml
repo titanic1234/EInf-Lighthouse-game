@@ -2,7 +2,7 @@ name: Build macOS App
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   workflow_dispatch:  # Manuell auslösbar per Knopfdruck auf GitHub
 
 jobs:
@@ -26,10 +26,11 @@ jobs:
       - name: App bauen
         run: pyinstaller main.spec
 
-      - name: Fertige .app als ZIP verpacken
-        run: |
-          cd dist
-          zip -r ../MeinSpiel-Mac.zip EInf-Lighthouse-game.app
+      - name: Inhalt von dist anzeigen (zur Kontrolle)
+        run: ls -la dist/
+
+      - name: Fertiges Build als ZIP verpacken
+        run: zip -r MeinSpiel-Mac.zip dist/
 
       - name: Download-Link bereitstellen
         uses: actions/upload-artifact@v4
